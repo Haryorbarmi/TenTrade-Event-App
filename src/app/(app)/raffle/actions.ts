@@ -1,6 +1,7 @@
 "use server";
 
 import { requireSuperAdmin } from "@/lib/auth";
+import type { DisplayPoolEntry } from "@/lib/display";
 import {
   confirmQuizWinner,
   drawWinner,
@@ -37,9 +38,34 @@ export async function unlockDrawList(drawId: string) {
   return unlockDraw(await createClient(), createAdminClient(), me.id, drawId);
 }
 
+export type ShowPayload = {
+  complete: boolean;
+  pool: DisplayPoolEntry[]; // Client IDs and weights the winner was drawn from
+  winner: { clientId: string; name: string };
+};
+
+// The winner is chosen and saved before anything is shown. The browser then
+// only gets what the projector needs: Client IDs, weights, the winner's name.
+async function toShow(
+  db: Awaited<ReturnType<typeof createClient>>,
+  result: Awaited<ReturnType<typeof drawWinner>>,
+): Promise<{ ok: true; value: ShowPayload } | { ok: false; error: string }> {
+  if (!result.ok) return result;
+  const { data: a } = await db.from("attendees").select("client_id, name").eq("id", result.value.winner.attendee_id).single();
+  return {
+    ok: true,
+    value: {
+      complete: result.value.complete,
+      pool: result.value.pool.map((e) => ({ id: e.client_id, w: e.weight })),
+      winner: { clientId: a?.client_id ?? "", name: a?.name ?? "" },
+    },
+  };
+}
+
 export async function drawNextWinner(drawId: string) {
   const me = await requireSuperAdmin();
-  return drawWinner(await createClient(), createAdminClient(), me.id, drawId);
+  const db = await createClient();
+  return toShow(db, await drawWinner(db, createAdminClient(), me.id, drawId));
 }
 
 export async function addParticipant(clientId: string) {
@@ -59,7 +85,8 @@ export async function lookupQuizWinner(clientId: string) {
 
 export async function confirmQuizResult(drawId: string, clientId: string) {
   const me = await requireSuperAdmin();
-  return confirmQuizWinner(await createClient(), createAdminClient(), me.id, drawId, clientId);
+  const db = await createClient();
+  return toShow(db, await confirmQuizWinner(db, createAdminClient(), me.id, drawId, clientId));
 }
 
 const KINDS: ReplaceKind[] = ["absent", "ineligible", "other"];

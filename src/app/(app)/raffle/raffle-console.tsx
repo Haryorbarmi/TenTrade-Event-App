@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { DrawType } from "@/lib/draw-engine";
 import { formatLagosTime, shortName } from "@/lib/format";
-import { confirmQuizResult, drawNextWinner, lockDrawList } from "./actions";
+import { DISPLAY_LABELS } from "@/lib/display";
+import { confirmQuizResult, drawNextWinner, lockDrawList, type ShowPayload } from "./actions";
+import { DisplayControls, useCountdownSetting } from "./display-controls";
+import { useDisplayLink } from "./use-display-link";
 import { QuizResultSetup, QuizStage, useQuiz } from "./knowledge-panel";
 import { ParticipantTags, type Participant } from "./participant-tags";
 import { RedrawDialog, UnlockDialog } from "./raffle-dialogs";
@@ -75,6 +78,31 @@ export function RaffleConsole({ draws, draw, stats, winners, names, earlyBirdCut
     });
   }
 
+  // Draw (or confirm): the server picks and saves the winner first, then the
+  // projector plays the show. Knowledge Challenge goes straight to the winner.
+  const display = useDisplayLink();
+  const [countdown, setCountdown] = useCountdownSetting();
+  const [showing, setShowing] = useState(false);
+  function runShow(action: () => Promise<{ ok: true; value: ShowPayload } | { ok: false; error: string }>) {
+    setError(null);
+    startTransition(async () => {
+      const result = await action();
+      if (!result.ok) {
+        setError(result.error);
+      } else if (display.connected) {
+        const label = DISPLAY_LABELS[draw.type] ?? draw.name;
+        if (draw.type === "knowledge") {
+          display.reveal(label, result.value);
+        } else {
+          setShowing(true);
+          await display.play(label, result.value, countdown);
+          setShowing(false);
+        }
+      }
+      router.refresh();
+    });
+  }
+
   const stageLabel =
     draw.status === "open" ? "lock the list to draw" : draw.status === "locked" ? "ready to draw" : "complete";
   const drawLabel =
@@ -89,14 +117,7 @@ export function RaffleConsole({ draws, draw, stats, winners, names, earlyBirdCut
           <h1 className="font-heading text-[30px] leading-[normal] text-ink">Raffle</h1>
           <p className="text-[14px] font-light leading-[normal] text-muted">Pick the draw, lock the eligible list, then draw.</p>
         </div>
-        <button
-          type="button"
-          disabled
-          title="The projector display is built in Phase 4."
-          className="flex h-[44px] items-center justify-center rounded-[8px] border border-line bg-white px-[20px] text-[14px] text-ink disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Open display screen
-        </button>
+        <DisplayControls showing={showing} />
       </header>
 
       <div className="flex w-full flex-col items-start gap-[24px] lg:flex-row">
@@ -164,7 +185,7 @@ export function RaffleConsole({ draws, draw, stats, winners, names, earlyBirdCut
               quiz={quiz}
               drawName={draw.name}
               pending={pending}
-              onConfirm={(clientId) => run(() => confirmQuizResult(draw.id, clientId))}
+              onConfirm={(clientId) => runShow(() => confirmQuizResult(draw.id, clientId))}
             />
           ) : (
             <section className="flex w-full flex-col items-center gap-[16px] rounded-[12px] bg-ink px-6 py-[36px] text-center md:px-[32px]">
@@ -178,11 +199,31 @@ export function RaffleConsole({ draws, draw, stats, winners, names, earlyBirdCut
               <button
                 type="button"
                 disabled={pending || draw.status !== "locked"}
-                onClick={() => run(() => drawNextWinner(draw.id))}
+                onClick={() => runShow(() => drawNextWinner(draw.id))}
                 className="bg-accent-gradient flex h-[52px] w-full max-w-[300px] items-center justify-center rounded-[8px] text-[14px] font-semibold text-white disabled:opacity-40"
               >
-                {pending ? "Drawing…" : drawLabel}
+                {showing ? "On the projector…" : pending ? "Drawing…" : drawLabel}
               </button>
+              {draw.type !== "knowledge" && (
+                <label className="flex items-center gap-[8px] text-[13px] font-light text-white/60">
+                  Countdown
+                  <input
+                    type="number"
+                    min={0}
+                    max={60}
+                    value={countdown}
+                    disabled={pending}
+                    onChange={(e) => setCountdown(e.target.value)}
+                    className="h-[30px] w-[56px] rounded-[6px] border border-white/20 bg-transparent px-[8px] text-center text-white outline-none focus:border-accent-from"
+                  />
+                  seconds
+                </label>
+              )}
+              {!display.connected && draw.status === "locked" && (
+                <p className="text-[12px] font-light text-white/50">
+                  Display not connected: the result will only show on this screen.
+                </p>
+              )}
               <div className="flex gap-[24px] text-[13px] leading-[normal]">
                 <Stat label={weighted ? "Tickets" : "Pool"} value={weighted ? stats.entries : stats.people} />
                 <Stat

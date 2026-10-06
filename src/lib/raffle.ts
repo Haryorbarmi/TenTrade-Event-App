@@ -139,7 +139,7 @@ export async function drawWinner(
   actor: string,
   drawId: string,
   random?: (max: number) => number,
-): Promise<Result<{ winner: Winner; complete: boolean }>> {
+): Promise<Result<{ winner: Winner; complete: boolean; pool: PoolEntry[] }>> {
   const draw = await loadDraw(db, drawId);
   if (!draw) return fail("Draw not found.");
   if (draw.status === "open") return fail("Lock the list before drawing.");
@@ -190,7 +190,8 @@ export async function drawWinner(
     total: pick.totalTickets,
     random_value: pick.randomValue,
   });
-  return { ok: true, value: { winner: saved as Winner, complete } };
+  // `pool` is exactly what the winner was picked from; the projector shuffles through it.
+  return { ok: true, value: { winner: saved as Winner, complete, pool } };
 }
 
 // Event Engagement participants. Only while the list is unlocked: a locked
@@ -250,7 +251,7 @@ export async function confirmQuizWinner(
   actor: string,
   drawId: string,
   clientId: string,
-): Promise<Result<{ winner: Winner; complete: boolean }>> {
+): Promise<Result<{ winner: Winner; complete: boolean; pool: PoolEntry[] }>> {
   const draw = await loadDraw(db, drawId);
   if (!draw || draw.type !== "knowledge") return fail("Draw not found.");
 

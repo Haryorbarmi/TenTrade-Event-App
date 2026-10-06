@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- fixed-size SVG assets from Figma */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Logo } from "@/components/logo";
+import { ALIVE_MS, openDisplayChannel } from "@/lib/display-channel";
 import {
   SHUFFLE_MS,
   SHUFFLE_TICK_MS,
@@ -21,6 +22,7 @@ export function DisplayScreen({ practice, freezeStep }: { practice: boolean; fre
   const [state, setState] = useState<DisplayState>({ kind: "waiting" });
 
   usePracticeLoop(practice, freezeStep, setState);
+  useRaffleLink(!practice, setState);
 
   return (
     <main className="fixed inset-0 overflow-hidden bg-ink">
@@ -41,6 +43,24 @@ const keys = new WeakMap<DisplayState, number>();
 function stateKey(state: DisplayState) {
   if (!keys.has(state)) keys.set(state, ++keyCounter);
   return keys.get(state);
+}
+
+// Live: show whatever the Raffle page sends. If the Raffle page goes away, the
+// last screen simply stays up. A reloaded display asks for the current screen.
+function useRaffleLink(enabled: boolean, setState: (s: DisplayState) => void) {
+  useEffect(() => {
+    if (!enabled) return;
+    const channel = openDisplayChannel((m) => {
+      if (m.type === "state") setState(m.state);
+    });
+    if (!channel) return;
+    channel.post({ type: "hello" });
+    const alive = setInterval(() => channel.post({ type: "alive" }), ALIVE_MS);
+    return () => {
+      clearInterval(alive);
+      channel.close();
+    };
+  }, [enabled, setState]);
 }
 
 // Practice: cycles through all four states with fake IDs; nothing is sent or saved.
