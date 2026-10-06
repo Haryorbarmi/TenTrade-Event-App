@@ -20,11 +20,11 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Verifies the token locally (no network trip) and refreshes it when needed.
+  const { data } = await supabase.auth.getClaims();
+  const signedIn = !!data?.claims?.sub;
 
-  if (!user && !PUBLIC_PATHS.has(request.nextUrl.pathname)) {
+  if (!signedIn && !PUBLIC_PATHS.has(request.nextUrl.pathname)) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
   return response;
