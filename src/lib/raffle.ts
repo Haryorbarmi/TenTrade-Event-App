@@ -47,9 +47,10 @@ async function loadDraw(db: SupabaseClient, drawId: string): Promise<Draw | null
   return data as Draw | null;
 }
 
-// Everyone currently holding a prize, in any draw.
-async function currentWinnerIds(db: SupabaseClient): Promise<Set<string>> {
-  const { data, error } = await db.from("winners").select("attendee_id").eq("replaced", false);
+// Everyone who can no longer win anything: current prize holders (one prize per
+// attendee) and winners replaced because they were absent (not in the room).
+async function excludedAttendeeIds(db: SupabaseClient): Promise<Set<string>> {
+  const { data, error } = await db.from("winners").select("attendee_id").or("replaced.eq.false,replace_kind.eq.absent");
   if (error) throw new Error(`Could not load winners: ${error.message}`);
   return new Set((data ?? []).map((w) => w.attendee_id));
 }
@@ -66,7 +67,7 @@ export async function previewPool(
 ): Promise<Result<PoolSnapshot>> {
   const [{ data: attendees, error }, winnerIds, participants] = await Promise.all([
     db.from("attendees").select("id, seq, client_id, eligible, tickets"),
-    currentWinnerIds(db),
+    excludedAttendeeIds(db),
     draw.type === "engagement" ? db.from("participants").select("attendee_id") : Promise.resolve({ data: [] }),
   ]);
   if (error || !attendees) return fail("Could not load the attendee list.");
@@ -145,13 +146,15 @@ export async function drawWinner(
   if (draw.status === "done" || !draw.pool_snapshot) return fail("This draw is complete.");
 
   const [winnerIds, { data: mine }] = await Promise.all([
-    currentWinnerIds(db),
-    db.from("winners").select("id").eq("draw_id", drawId).eq("replaced", false),
+    excludedAttendeeIds(db),
+    db.from("winners").select("position").eq("draw_id", drawId).eq("replaced", false),
   ]);
-  const position = (mine?.length ?? 0) + 1;
-  if (position > draw.winners_count) return fail("All winners for this draw have been drawn.");
+  // First free slot: after a redraw this is the replaced winner's position.
+  const taken = new Set((mine ?? []).map((w) => w.position));
+  const position = Array.from({ length: draw.winners_count }, (_, i) => i + 1).find((p) => !taken.has(p));
+  if (position === undefined) return fail("All winners for this draw have been drawn.");
 
-  // One prize per attendee: also drop anyone who won another draw after this list was locked.
+  // Also drop anyone who won another draw, or was found absent, after this list was locked.
   const pool = draw.pool_snapshot.entries.filter((e) => !winnerIds.has(e.attendee_id));
   if (pool.length === 0) return fail("Everyone left in this locked list has already won a prize.");
 
@@ -175,7 +178,7 @@ export async function drawWinner(
     return fail("Could not save the winner. Try again.");
   }
 
-  const complete = position === draw.winners_count;
+  const complete = taken.size + 1 === draw.winners_count;
   if (complete) await db.from("draws").update({ status: "done" }).eq("id", drawId);
 
   await log(admin, actor, "winner_drawn", {
@@ -188,4 +191,47 @@ export async function drawWinner(
     random_value: pick.randomValue,
   });
   return { ok: true, value: { winner: saved as Winner, complete } };
+}
+
+export type ReplaceKind = "absent" | "ineligible" | "other";
+
+// Redraw, part 1: mark a winner as replaced (never deleted or overwritten) and
+// reopen their slot. The new winner is then drawn with drawWinner as usual.
+export async function replaceWinner(
+  db: SupabaseClient,
+  admin: SupabaseClient,
+  actor: string,
+  winnerId: string,
+  kind: ReplaceKind,
+  note: string,
+): Promise<Result<null>> {
+  const { data: winner } = await db
+    .from("winners")
+    .select("id, draw_id, attendee_id, position, replaced")
+    .eq("id", winnerId)
+    .maybeSingle();
+  if (!winner) return fail("Winner not found.");
+  if (winner.replaced) return fail("This winner has already been replaced.");
+
+  const reason = note.trim().slice(0, 300) || null;
+  const { data, error } = await admin
+    .from("winners")
+    .update({ replaced: true, replace_kind: kind, replaced_reason: reason })
+    .eq("id", winnerId)
+    .eq("replaced", false)
+    .select("id");
+  if (error || !data?.length) return fail("Could not replace this winner. Refresh and try again.");
+
+  // A completed draw has a free slot again, so it goes back to locked (same snapshot).
+  await db.from("draws").update({ status: "locked" }).eq("id", winner.draw_id).eq("status", "done");
+
+  await log(admin, actor, "winner_replaced", {
+    draw_id: winner.draw_id,
+    winner_id: winnerId,
+    attendee_id: winner.attendee_id,
+    position: winner.position,
+    kind,
+    reason,
+  });
+  return { ok: true, value: null };
 }

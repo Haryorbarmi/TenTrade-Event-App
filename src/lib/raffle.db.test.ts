@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { drawWinner, lockDraw, unlockDraw, type Draw } from "./raffle";
+import { drawWinner, lockDraw, replaceWinner, unlockDraw, type Draw } from "./raffle";
 
 // Keys are only present when started with --env-file (npm run test:raffle-db).
 const RUN = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -73,7 +73,7 @@ describe.skipIf(!RUN)("raffle against the real database", () => {
       await admin.from("draws").update({ status: "open", pool_snapshot: null, locked_by: null, locked_at: null }).in("id", drawIds),
     ];
     for (const s of steps) if (s.error) console.error("CLEANUP FAILED:", s.error.message);
-    await admin.from("activity_log").delete().gte("at", started).in("action", ["draw_locked", "draw_unlocked", "winner_drawn"]);
+    await admin.from("activity_log").delete().gte("at", started).in("action", ["draw_locked", "draw_unlocked", "winner_drawn", "winner_replaced"]);
     for (const id of testIds) await admin.from("activity_log").delete().eq("detail->>attendee_id", id);
     await admin.from("attendees").delete().like("client_id", "DRAWTEST-%");
     await Promise.all([boss?.db.auth.signOut(), desk?.db.auth.signOut()]);
@@ -168,6 +168,48 @@ describe.skipIf(!RUN)("raffle against the real database", () => {
     }
     expect(new Set(winners).size).toBe(5);
     expect((await drawWinner(boss.db, admin, boss.id, draws.engagement.id)).ok).toBe(false);
+  });
+
+  it("redraw (absent): slot reopens, new winner fills the same position, absent person is out of later draws", async () => {
+    const { data: before } = await admin
+      .from("winners")
+      .select("id, attendee_id")
+      .eq("draw_id", draws.engagement.id)
+      .eq("position", 2)
+      .eq("replaced", false)
+      .single();
+    const absentId = before!.attendee_id;
+
+    expect((await replaceWinner(desk.db, admin, desk.id, before!.id, "absent", "")).ok).toBe(false); // registrar
+    expect((await replaceWinner(boss.db, admin, boss.id, before!.id, "absent", "Not in the hall")).ok).toBe(true);
+    expect((await replaceWinner(boss.db, admin, boss.id, before!.id, "absent", "")).ok).toBe(false); // twice
+
+    const { data: kept } = await admin.from("winners").select("replaced, replace_kind, replaced_reason").eq("id", before!.id).single();
+    expect(kept).toEqual({ replaced: true, replace_kind: "absent", replaced_reason: "Not in the hall" }); // never deleted
+    const { data: d } = await admin.from("draws").select("status").eq("id", draws.engagement.id).single();
+    expect(d!.status).toBe("locked");
+
+    const r = await drawWinner(boss.db, admin, boss.id, draws.engagement.id);
+    if (!r.ok) throw new Error(r.error);
+    expect(r.value.winner.position).toBe(2);
+    expect(r.value.winner.attendee_id).not.toBe(absentId);
+    expect(r.value.complete).toBe(true);
+
+    // The absent person cannot come back, even in a draw they would qualify for.
+    const absentClient = Object.entries(test).find(([, id]) => id === absentId)![0];
+    const lock = await lockDraw(boss.db, admin, boss.id, draws.knowledge.id, { tiedClientIds: [absentClient, "DRAWTEST-1"] });
+    expect(lock.ok).toBe(false); // T1 already won Lucky, absent person excluded: nobody left
+    if (!lock.ok) expect(lock.error).toMatch(/Nobody is in the pool/);
+  });
+
+  it("redraw (not eligible): only that win is cancelled, the person stays in later draws", async () => {
+    const { data: grand } = await admin.from("winners").select("id, attendee_id").eq("draw_id", draws.grand.id).eq("replaced", false).single();
+    expect((await replaceWinner(boss.db, admin, boss.id, grand!.id, "ineligible", "Tickets entered wrongly")).ok).toBe(true);
+
+    const client = Object.entries(test).find(([, id]) => id === grand!.attendee_id)?.[0];
+    if (!client) return; // the Grand winner was a real attendee, not a test one; nothing more to check
+    const lock = await lockDraw(boss.db, admin, boss.id, draws.knowledge.id, { tiedClientIds: [client] });
+    expect(lock.ok && lock.value.entries.map((e) => e.attendee_id)).toEqual([grand!.attendee_id]);
   });
 
   it("across all draws, nobody holds two prizes", async () => {

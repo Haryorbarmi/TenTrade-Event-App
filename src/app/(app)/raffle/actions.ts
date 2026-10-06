@@ -1,7 +1,7 @@
 "use server";
 
 import { requireSuperAdmin } from "@/lib/auth";
-import { drawWinner, lockDraw, previewPool, unlockDraw } from "@/lib/raffle";
+import { drawWinner, lockDraw, previewPool, replaceWinner, unlockDraw, type ReplaceKind } from "@/lib/raffle";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -29,4 +29,13 @@ export async function unlockDrawList(drawId: string) {
 export async function drawNextWinner(drawId: string) {
   const me = await requireSuperAdmin();
   return drawWinner(await createClient(), createAdminClient(), me.id, drawId);
+}
+
+const KINDS: ReplaceKind[] = ["absent", "ineligible", "other"];
+
+export async function replaceDrawWinner(winnerId: string, kind: ReplaceKind, note: string) {
+  const me = await requireSuperAdmin();
+  if (!KINDS.includes(kind)) return { ok: false as const, error: "Choose a reason." };
+  if (kind === "other" && !note.trim()) return { ok: false as const, error: "Add a short note explaining the reason." };
+  return replaceWinner(await createClient(), createAdminClient(), me.id, winnerId, kind, note);
 }
