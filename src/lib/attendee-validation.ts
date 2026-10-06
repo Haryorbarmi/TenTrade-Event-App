@@ -37,7 +37,10 @@ export function attendeeFromForm(formData: FormData): AttendeeInput {
 export const duplicateClientIdMessage = (clientId: string) =>
   `Client ID ${clientId} is already registered. Each client can only be added once.`;
 
-const EMAIL_RE =/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+// Owner confirmed 2026-10-06: Client IDs are always exactly 6 digits.
+export const CLIENT_ID_RE = /^\d{6}$/;
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 // Nigerian mobile numbers: 080..., 0803 ..., +234 803 ..., 234803...
 // Returns the number as +234XXXXXXXXXX, or null if it is not valid.
@@ -59,7 +62,7 @@ export function validateAttendee(input: AttendeeInput): { data: CleanAttendee } 
   const phone = normalizeNigerianPhone(input.phone);
 
   if (!clientId) errors.clientId = "Enter the Client ID.";
-  else if (clientId.length > 50) errors.clientId = "Client ID is too long.";
+  else if (!CLIENT_ID_RE.test(clientId)) errors.clientId = "A Client ID is exactly 6 digits, like 104823.";
 
   if (!name) errors.name = "Enter the client's name.";
   else if (name.length > 100) errors.name = "Name is too long.";

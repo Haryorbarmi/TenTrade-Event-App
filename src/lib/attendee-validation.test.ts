@@ -41,6 +41,14 @@ describe("validateAttendee", () => {
     expect("errors" in result && Object.keys(result.errors).sort()).toEqual(["clientId", "eligible", "email", "name", "phone"]);
   });
 
+  it("requires a Client ID of exactly 6 digits", () => {
+    for (const bad of ["10023", "1002345", "10O234", "100-234", "ABC123"]) {
+      const result = validateAttendee({ ...valid, clientId: bad });
+      expect("errors" in result && result.errors.clientId, bad).toMatch(/exactly 6 digits/);
+    }
+    expect("data" in validateAttendee({ ...valid, clientId: " 012345 " })).toBe(true); // leading zero kept, spaces trimmed
+  });
+
   it("checks email and phone formats", () => {
     const result = validateAttendee({ ...valid, email: "ada@", phone: "12345" });
     expect("errors" in result && result.errors).toMatchObject({ email: expect.any(String), phone: expect.any(String) });

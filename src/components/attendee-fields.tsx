@@ -70,6 +70,7 @@ export function AttendeeFields({ values, onChange, errors, clientIdWarning, onCl
           onChange={(e) => set({ clientId: e.target.value })}
           onBlur={(e) => onClientIdBlur(e.target.value)}
           placeholder="Enter Client ID"
+          inputMode="numeric"
           autoComplete="off"
           autoFocus={autoFocus}
           aria-invalid={!!clientIdError}
@@ -78,7 +79,7 @@ export function AttendeeFields({ values, onChange, errors, clientIdWarning, onCl
         {clientIdError ? (
           <span className={errorClass}>{clientIdError}</span>
         ) : (
-          <span className={hintClass}>Type it exactly as shown on the portal.</span>
+          <span className={hintClass}>6 digits. Type it exactly as shown on the portal.</span>
         )}
       </label>
 
