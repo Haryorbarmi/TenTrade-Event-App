@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SETTLE_MS, SHUFFLE_MS, expandPool, practiceState, shuffleFrame } from "./display";
+import { SETTLE_MS, SHUFFLE_MS, expandPool, practiceRound, shuffleFrame } from "./display";
 
 describe("expandPool", () => {
   it("repeats each Client ID once per ticket so bigger holders appear more often", () => {
@@ -41,12 +41,23 @@ describe("shuffleFrame", () => {
   });
 });
 
-describe("practiceState", () => {
-  it("cycles waiting → countdown → shuffling → winner with fake data only", () => {
-    expect([0, 1, 2, 3, 4].map((s) => practiceState(s).kind)).toEqual(["waiting", "countdown", "shuffling", "winner", "waiting"]);
-    const shuffle = practiceState(2);
+describe("practiceRound", () => {
+  it("runs waiting → countdown → shuffling → winner with fake 6-digit IDs only", () => {
+    const round = practiceRound();
+    expect(round.map((s) => s.kind)).toEqual(["waiting", "countdown", "shuffling", "winner"]);
+    const shuffle = round[2]!;
     if (shuffle.kind !== "shuffling") throw new Error("expected shuffling");
     expect(shuffle.winner.name).toBe("Practice Winner");
-    expect(shuffle.pool.every((p) => /^\d{5}$/.test(p.id))).toBe(true);
+    expect(shuffle.pool.every((p) => /^\d{6}$/.test(p.id))).toBe(true);
+  });
+
+  it("the winner screen shows exactly the ID the shuffle settles on", () => {
+    for (let i = 0; i < 20; i++) {
+      const [, , shuffle, winner] = practiceRound();
+      if (shuffle!.kind !== "shuffling" || winner!.kind !== "winner") throw new Error("unexpected states");
+      const settled = shuffleFrame(expandPool(shuffle!.pool), shuffle!.winner.clientId, SHUFFLE_MS).join("");
+      expect(winner!.clientId).toBe(settled);
+      expect(shuffle!.pool.map((p) => p.id)).toContain(settled); // a real ID from the pool
+    }
   });
 });

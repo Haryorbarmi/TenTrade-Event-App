@@ -42,20 +42,18 @@ export function shuffleFrame(ids: string[], winner: string, elapsed: number, ran
   return Array.from({ length: n }, (_, i) => (i < settled ? winner[i]! : (pick[i] ?? DIGITS[Math.floor(random() * 10)]!)));
 }
 
-// Practice mode: fake 5-digit IDs, never real attendee data.
-export function practiceState(step: number, random: () => number = Math.random): DisplayState {
-  const fakeId = () => String(10000 + Math.floor(random() * 90000));
+// Practice mode: one rehearsal round with fake 6-digit IDs (the length of real
+// Client IDs), never real attendee data. The shuffle and the winner screen share
+// the same fake winner, exactly like a live draw.
+export function practiceRound(random: () => number = Math.random): DisplayState[] {
+  const fakeId = () => String(100000 + Math.floor(random() * 900000));
   const label = "Practice";
-  switch (step % 4) {
-    case 0:
-      return { kind: "waiting" };
-    case 1:
-      return { kind: "countdown", label, seconds: 5 };
-    case 2: {
-      const pool = Array.from({ length: 30 }, () => ({ id: fakeId(), w: 1 + Math.floor(random() * 3) }));
-      return { kind: "shuffling", label, pool, winner: { clientId: pool[0]!.id, name: "Practice Winner" } };
-    }
-    default:
-      return { kind: "winner", label, clientId: "12345", name: "Practice Winner" };
-  }
+  const pool = Array.from({ length: 30 }, () => ({ id: fakeId(), w: 1 + Math.floor(random() * 3) }));
+  const winner = { clientId: pool[Math.floor(random() * pool.length)]!.id, name: "Practice Winner" };
+  return [
+    { kind: "waiting" },
+    { kind: "countdown", label, seconds: 5 },
+    { kind: "shuffling", label, pool, winner },
+    { kind: "winner", label, clientId: winner.clientId, name: winner.name },
+  ];
 }

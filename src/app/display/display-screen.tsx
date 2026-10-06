@@ -8,7 +8,7 @@ import {
   SHUFFLE_MS,
   SHUFFLE_TICK_MS,
   expandPool,
-  practiceState,
+  practiceRound,
   shuffleFrame,
   type DisplayState,
 } from "@/lib/display";
@@ -69,13 +69,16 @@ function usePracticeLoop(practice: boolean, freezeStep: number | null, setState:
   useEffect(() => {
     if (!practice) return;
     if (freezeStep !== null) {
-      setState(practiceState(freezeStep));
+      setState(practiceRound()[freezeStep]!);
       return;
     }
+    // A new fake round (with its own winner) every cycle; shuffle and winner screen match.
     let step = 0;
+    let round = practiceRound();
     let timer: ReturnType<typeof setTimeout>;
     const next = () => {
-      setState(practiceState(step));
+      if (step % 4 === 0) round = practiceRound();
+      setState(round[step % 4]!);
       timer = setTimeout(next, PRACTICE_STEP_MS[step % 4]);
       step++;
     };
