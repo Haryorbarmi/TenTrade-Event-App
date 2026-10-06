@@ -10,7 +10,10 @@ const NAV_ITEMS = [
   { href: "/raffle", label: "Raffle" },
 ];
 // Not in the Figma sidebar; shown to Super Admins only (the page re-checks).
-const ADMIN_ITEMS = [{ href: "/event-data", label: "Event data" }];
+const ADMIN_ITEMS = [
+  { href: "/users", label: "Users" },
+  { href: "/event-data", label: "Event data" },
+];
 
 export function SidebarNav({ layout, superAdmin }: { layout: "column" | "row"; superAdmin: boolean }) {
   const pathname = usePathname();
