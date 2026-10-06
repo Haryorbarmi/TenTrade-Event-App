@@ -1,7 +1,16 @@
 "use server";
 
 import { requireSuperAdmin } from "@/lib/auth";
-import { drawWinner, lockDraw, previewPool, replaceWinner, unlockDraw, type ReplaceKind } from "@/lib/raffle";
+import {
+  drawWinner,
+  lockDraw,
+  previewPool,
+  replaceWinner,
+  tagParticipant,
+  unlockDraw,
+  untagParticipant,
+  type ReplaceKind,
+} from "@/lib/raffle";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -29,6 +38,16 @@ export async function unlockDrawList(drawId: string) {
 export async function drawNextWinner(drawId: string) {
   const me = await requireSuperAdmin();
   return drawWinner(await createClient(), createAdminClient(), me.id, drawId);
+}
+
+export async function addParticipant(clientId: string) {
+  await requireSuperAdmin();
+  return tagParticipant(await createClient(), clientId);
+}
+
+export async function removeParticipant(attendeeId: string) {
+  await requireSuperAdmin();
+  return untagParticipant(await createClient(), attendeeId);
 }
 
 const KINDS: ReplaceKind[] = ["absent", "ineligible", "other"];

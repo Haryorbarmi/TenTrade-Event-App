@@ -193,6 +193,35 @@ export async function drawWinner(
   return { ok: true, value: { winner: saved as Winner, complete } };
 }
 
+// Event Engagement participants. Only while the list is unlocked: a locked
+// snapshot would not include changes, so the app refuses rather than mislead.
+async function engagementIsOpen(db: SupabaseClient): Promise<boolean> {
+  const { data } = await db.from("draws").select("status").eq("type", "engagement").maybeSingle();
+  return data?.status === "open";
+}
+
+export async function tagParticipant(db: SupabaseClient, clientId: string): Promise<Result<{ name: string }>> {
+  const id = clientId.trim();
+  if (!id) return fail("Enter a Client ID.");
+  if (!(await engagementIsOpen(db))) return fail("Unlock the list to change participants.");
+
+  const { data: attendee } = await db.from("attendees").select("id, name").eq("client_id", id).maybeSingle();
+  if (!attendee) return fail(`No attendee with Client ID ${id}. Register them first.`);
+  if ((await excludedAttendeeIds(db)).has(attendee.id)) {
+    return fail(`${attendee.name} (${id}) has already won a prize or was found absent, so they cannot be in this draw.`);
+  }
+
+  const { error } = await db.from("participants").insert({ attendee_id: attendee.id });
+  if (error) return fail(error.code === "23505" ? `${attendee.name} (${id}) is already tagged.` : "Could not tag. Try again.");
+  return { ok: true, value: { name: attendee.name } };
+}
+
+export async function untagParticipant(db: SupabaseClient, attendeeId: string): Promise<Result<null>> {
+  if (!(await engagementIsOpen(db))) return fail("Unlock the list to change participants.");
+  const { error } = await db.from("participants").delete().eq("attendee_id", attendeeId);
+  return error ? fail("Could not remove. Try again.") : { ok: true, value: null };
+}
+
 export type ReplaceKind = "absent" | "ineligible" | "other";
 
 // Redraw, part 1: mark a winner as replaced (never deleted or overwritten) and

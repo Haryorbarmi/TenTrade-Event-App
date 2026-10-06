@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import type { DrawType } from "@/lib/draw-engine";
 import { formatLagosTime, shortName } from "@/lib/format";
 import { drawNextWinner, lockDrawList } from "./actions";
+import { ParticipantTags, type Participant } from "./participant-tags";
 import { RedrawDialog, UnlockDialog } from "./raffle-dialogs";
 
 export type DrawSummary = {
@@ -37,9 +38,8 @@ export type PoolStats = { people: number; entries: number; remaining: number };
 
 const money = (n: number) => `$${n.toLocaleString("en-US")}`;
 const REPLACE_LABELS = { absent: "Absent", ineligible: "Not eligible", other: "Other" } as const;
-// Built in the next steps: participant tags and the quiz winner flow.
+// Built in the next step: the quiz winner flow.
 const NOT_READY: Partial<Record<DrawType, string>> = {
-  engagement: "Tagging participants for this draw is added in the next step.",
   knowledge: "Confirming the quiz winner (and tie-breaks) is added in the next step.",
 };
 
@@ -50,10 +50,11 @@ type Props = {
   winners: DrawWinnerRow[];
   names: Record<string, string>;
   earlyBirdCutoff: string | null;
+  participants: Participant[];
 };
 
 // Figma: Raffle · Grand Draw (3952:194), Raffle · Early Bird (4007:1088) and variants.
-export function RaffleConsole({ draws, draw, stats, winners, names, earlyBirdCutoff }: Props) {
+export function RaffleConsole({ draws, draw, stats, winners, names, earlyBirdCutoff, participants }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -124,7 +125,8 @@ export function RaffleConsole({ draws, draw, stats, winners, names, earlyBirdCut
             </span>
           </label>
 
-          <PoolSummary draw={draw} stats={stats} earlyBirdCutoff={earlyBirdCutoff} />
+          <PoolSummary draw={draw} stats={stats} earlyBirdCutoff={earlyBirdCutoff} tagged={participants.length} />
+          {draw.type === "engagement" && <ParticipantTags participants={participants} editable={draw.status === "open"} />}
           <p className="-mt-[8px] text-[12px] font-light leading-[normal] text-muted">
             Previous winners, and winners found absent, are left out of this draw automatically.
           </p>
@@ -200,7 +202,10 @@ export function RaffleConsole({ draws, draw, stats, winners, names, earlyBirdCut
             </button>
             <div className="flex gap-[24px] text-[13px] leading-[normal]">
               <Stat label={weighted ? "Tickets" : "Pool"} value={weighted ? stats.entries : stats.people} />
-              <Stat label="Drawn" value={current.length} />
+              <Stat
+                label="Drawn"
+                value={draw.winners_count > 1 ? `${current.length} / ${draw.winners_count}` : current.length}
+              />
               <Stat label="Remaining" value={stats.remaining} />
             </div>
           </section>
@@ -211,7 +216,14 @@ export function RaffleConsole({ draws, draw, stats, winners, names, earlyBirdCut
             </p>
           )}
 
-          <WinnersTable winners={winners} names={names} weighted={weighted} onRedraw={setRedrawing} disabled={pending} />
+          <WinnersTable
+            winners={winners}
+            names={names}
+            weighted={weighted}
+            winnersCount={draw.winners_count}
+            onRedraw={setRedrawing}
+            disabled={pending}
+          />
         </div>
       </div>
 
@@ -243,7 +255,7 @@ export function RaffleConsole({ draws, draw, stats, winners, names, earlyBirdCut
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({ label, value }: { label: string; value: number | string }) {
   return (
     <span className="flex items-center gap-[6px]">
       <span className="font-light text-white/60">{label}</span>
@@ -252,7 +264,17 @@ function Stat({ label, value }: { label: string; value: number }) {
   );
 }
 
-function PoolSummary({ draw, stats, earlyBirdCutoff }: { draw: DrawDetail; stats: PoolStats; earlyBirdCutoff: string | null }) {
+function PoolSummary({
+  draw,
+  stats,
+  earlyBirdCutoff,
+  tagged,
+}: {
+  draw: DrawDetail;
+  stats: PoolStats;
+  earlyBirdCutoff: string | null;
+  tagged: number;
+}) {
   const equal = (
     <span className="mt-[4px] self-start rounded-full bg-[rgba(115,115,115,0.12)] px-[10px] py-[4px] text-[12px] font-semibold text-muted">
       Equal chance for everyone
@@ -284,7 +306,11 @@ function PoolSummary({ draw, stats, earlyBirdCutoff }: { draw: DrawDetail; stats
     case "lucky":
       return box(`${people(stats.people, "attendee")} checked in`, "Everyone present can win.", equal);
     case "engagement":
-      return box(`${people(stats.people, "participant")} tagged`, "Attendees tagged as participants · 5 winners, one at a time.", equal);
+      return box(
+        `${people(draw.status === "open" ? tagged : stats.people, "participant")} ${draw.status === "open" ? "tagged" : "in the locked list"}`,
+        `${draw.winners_count} winners will be drawn, one at a time`,
+        equal,
+      );
     case "knowledge":
       return box("Quiz winner", "Decided by the quiz. Enter the top scorer's Client ID to confirm.");
   }
@@ -294,12 +320,14 @@ function WinnersTable({
   winners,
   names,
   weighted,
+  winnersCount,
   onRedraw,
   disabled,
 }: {
   winners: DrawWinnerRow[];
   names: Record<string, string>;
   weighted: boolean;
+  winnersCount: number;
   onRedraw: (w: DrawWinnerRow) => void;
   disabled: boolean;
 }) {
@@ -309,7 +337,9 @@ function WinnersTable({
       <h2 className="px-[24px] py-[20px] text-[16px] font-semibold leading-[normal] text-ink">Winners</h2>
       {ordered.length === 0 ? (
         <p className="px-[24px] pb-[24px] text-[14px] font-light leading-[normal] text-muted">
-          No winners yet. Winners appear here after each draw.
+          {winnersCount > 1
+            ? `No winners yet. The ${winnersCount} winners appear here, one at a time.`
+            : "No winners yet. Winners appear here after each draw."}
         </p>
       ) : (
         <div className="overflow-x-auto">

@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { drawWinner, lockDraw, replaceWinner, unlockDraw, type Draw } from "./raffle";
+import { drawWinner, lockDraw, replaceWinner, tagParticipant, unlockDraw, untagParticipant, type Draw } from "./raffle";
 
 // Keys are only present when started with --env-file (npm run test:raffle-db).
 const RUN = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -154,9 +154,19 @@ describe.skipIf(!RUN)("raffle against the real database", () => {
 
   it("Event Engagement: 5 different winners one at a time, then complete", async () => {
     const tagged = ["DRAWTEST-2", "DRAWTEST-3", "DRAWTEST-4", "DRAWTEST-5", "DRAWTEST-6", "DRAWTEST-7", "DRAWTEST-8"];
-    const { error } = await boss.db.from("participants").insert(tagged.map((c) => ({ attendee_id: test[c] })));
-    expect(error).toBeNull();
+    for (const c of tagged) expect((await tagParticipant(boss.db, ` ${c} `)).ok).toBe(true);
+
+    // Tagging rules.
+    expect(await tagParticipant(boss.db, "NOPE-404")).toEqual({ ok: false, error: "No attendee with Client ID NOPE-404. Register them first." });
+    expect((await tagParticipant(boss.db, "DRAWTEST-2")) as { error?: string }).toMatchObject({ ok: false, error: expect.stringMatching(/already tagged/) });
+    expect((await tagParticipant(boss.db, "DRAWTEST-1")) as { error?: string }).toMatchObject({ ok: false, error: expect.stringMatching(/already won/) }); // Lucky winner
+    expect((await tagParticipant(desk.db, "DRAWTEST-1")).ok).toBe(false); // registrar: RLS
+    expect((await untagParticipant(boss.db, test["DRAWTEST-8"]!)).ok).toBe(true);
+    expect((await tagParticipant(boss.db, "DRAWTEST-8")).ok).toBe(true);
+
     expect((await lockDraw(boss.db, admin, boss.id, draws.engagement.id)).ok).toBe(true);
+    expect(await tagParticipant(boss.db, "DRAWTEST-1")).toEqual({ ok: false, error: "Unlock the list to change participants." });
+    expect(await untagParticipant(boss.db, test["DRAWTEST-2"]!)).toEqual({ ok: false, error: "Unlock the list to change participants." });
 
     const winners: string[] = [];
     for (let i = 1; i <= 5; i++) {

@@ -24,7 +24,7 @@ export default async function RafflePage({ searchParams }: PageProps<"/raffle">)
   const { draw: requested } = await searchParams;
   const draw = draws.find((d) => d.type === requested) ?? draws[0]!;
 
-  const [{ data: winnerRows }, { data: profiles }, excluded, { data: fiftieth }] = await Promise.all([
+  const [{ data: winnerRows }, { data: profiles }, excluded, { data: fiftieth }, { data: tagged }] = await Promise.all([
     supabase
       .from("winners")
       .select(
@@ -35,7 +35,13 @@ export default async function RafflePage({ searchParams }: PageProps<"/raffle">)
     supabase.from("profiles").select("id, name"),
     excludedAttendeeIds(supabase),
     supabase.from("attendees").select("created_at").eq("seq", 50).maybeSingle(),
+    draw.type === "engagement"
+      ? supabase.from("participants").select("attendee_id, attendee:attendees(client_id, name)").order("tagged_at")
+      : Promise.resolve({ data: [] }),
   ]);
+  const participants = ((tagged ?? []) as unknown as { attendee_id: string; attendee: { client_id: string; name: string } }[]).map(
+    (p) => ({ attendee_id: p.attendee_id, client_id: p.attendee.client_id, name: p.attendee.name }),
+  );
 
   // Pool numbers: the live preview while open, the locked snapshot afterwards,
   // minus anyone who has won or been found absent since.
@@ -67,6 +73,7 @@ export default async function RafflePage({ searchParams }: PageProps<"/raffle">)
       winners={(winnerRows ?? []) as unknown as DrawWinnerRow[]}
       names={Object.fromEntries((profiles ?? []).map((p) => [p.id, p.name]))}
       earlyBirdCutoff={fiftieth?.created_at ?? null}
+      participants={participants}
     />
   );
 }
