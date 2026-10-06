@@ -14,6 +14,7 @@ import {
   type PoolCandidate,
   type PoolEntry,
 } from "./draw-engine";
+import { RESET_PREFIX } from "./raffle-labels";
 
 export type Draw = {
   id: string;
@@ -262,6 +263,45 @@ export async function confirmQuizWinner(
   const result = await drawWinner(db, admin, actor, drawId);
   if (!result.ok) await unlockDraw(db, admin, actor, drawId); // put it back as it was
   return result;
+}
+
+// Reset one draw after a problem: cancel its current winners (kept on record,
+// never deleted) and reopen it from the start. The cancelled winners can win
+// again; anyone replaced earlier as absent stays excluded.
+
+export async function resetDraw(
+  db: SupabaseClient,
+  admin: SupabaseClient,
+  actor: string,
+  drawId: string,
+  reason: string,
+): Promise<Result<{ cancelled: number }>> {
+  const why = reason.trim().slice(0, 250);
+  if (!why) return fail("Add a short reason for the reset.");
+  const draw = await loadDraw(db, drawId);
+  if (!draw) return fail("Draw not found.");
+
+  const { data: cancelled, error } = await admin
+    .from("winners")
+    .update({ replaced: true, replace_kind: "other", replaced_reason: `${RESET_PREFIX}${why}` })
+    .eq("draw_id", drawId)
+    .eq("replaced", false)
+    .select("id, attendee_id");
+  if (error) return fail("Could not reset the draw. Try again.");
+
+  const { error: reopenError } = await db
+    .from("draws")
+    .update({ status: "open", pool_snapshot: null, locked_by: null, locked_at: null })
+    .eq("id", drawId);
+  if (reopenError) return fail("Winners were cancelled but the draw could not be reopened. Refresh and press Unlock.");
+
+  await log(admin, actor, "draw_reset", {
+    draw_id: drawId,
+    draw: draw.type,
+    reason: why,
+    cancelled_winners: (cancelled ?? []).map((w) => w.attendee_id),
+  });
+  return { ok: true, value: { cancelled: cancelled?.length ?? 0 } };
 }
 
 export type ReplaceKind = "absent" | "ineligible" | "other";

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { ReplaceKind } from "@/lib/raffle";
-import { replaceDrawWinner, unlockDrawList } from "./actions";
+import { replaceDrawWinner, resetDrawFromStart, unlockDrawList } from "./actions";
 import type { DrawWinnerRow } from "./raffle-console";
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -92,6 +92,75 @@ export function UnlockDialog({
         The locked pool for <span className="font-semibold text-ink">{drawName}</span> will be discarded. When you lock again, the
         pool is rebuilt from the current attendee list. This is recorded with your name and the time.
       </p>
+    </ConfirmDialog>
+  );
+}
+
+export function ResetDialog({
+  drawId,
+  drawName,
+  winnerCount,
+  onCancel,
+  onDone,
+}: {
+  drawId: string;
+  drawName: string;
+  winnerCount: number;
+  onCancel: () => void;
+  onDone: (result: Result) => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <ConfirmDialog
+      title={`Reset ${drawName}?`}
+      confirmLabel="Reset draw"
+      pending={pending}
+      onCancel={onCancel}
+      onConfirm={() => {
+        if (!reason.trim()) {
+          setError("Add a short reason for the reset.");
+          return;
+        }
+        startTransition(async () => {
+          const r = await resetDrawFromStart(drawId, reason);
+          onDone(r.ok ? { ok: true } : r);
+        });
+      }}
+    >
+      <ul className="flex list-disc flex-col gap-[6px] pl-[18px] text-[14px] font-light leading-[1.5] text-muted">
+        <li>
+          {winnerCount === 0 ? (
+            "There are no winners to cancel."
+          ) : (
+            <>
+              <span className="font-semibold text-ink">
+                {winnerCount} winner{winnerCount === 1 ? "" : "s"}
+              </span>{" "}
+              will be cancelled. They stay on record as &quot;Draw reset&quot; and can win again.
+            </>
+          )}
+        </li>
+        <li>The list is unlocked, so you start again from step 1.</li>
+        <li>Other draws are not affected. The reset is recorded with your name and the time.</li>
+      </ul>
+      <label className="flex flex-col gap-[8px]">
+        <span className="text-[13px] font-semibold">Reason</span>
+        <input
+          value={reason}
+          onChange={(e) => {
+            setReason(e.target.value);
+            setError(null);
+          }}
+          maxLength={250}
+          autoFocus
+          placeholder="e.g. Projector froze during the draw"
+          className="h-[44px] rounded-[8px] border border-line px-[14px] text-[14px] font-light outline-none focus:border-accent"
+        />
+        {error && <span className="text-[12px] text-[#c81e1e]">{error}</span>}
+      </label>
     </ConfirmDialog>
   );
 }

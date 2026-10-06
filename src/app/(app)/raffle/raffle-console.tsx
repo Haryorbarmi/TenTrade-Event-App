@@ -6,12 +6,13 @@ import { useState, useTransition } from "react";
 import type { DrawType } from "@/lib/draw-engine";
 import { formatLagosTime, shortName } from "@/lib/format";
 import { DISPLAY_LABELS } from "@/lib/display";
+import { RESET_PREFIX } from "@/lib/raffle-labels";
 import { confirmQuizResult, drawNextWinner, lockDrawList, type ShowPayload } from "./actions";
 import { DisplayControls, useCountdownSetting } from "./display-controls";
 import { useDisplayLink } from "./use-display-link";
 import { QuizResultSetup, QuizStage, useQuiz } from "./knowledge-panel";
 import { ParticipantTags, type Participant } from "./participant-tags";
-import { RedrawDialog, UnlockDialog } from "./raffle-dialogs";
+import { RedrawDialog, ResetDialog, UnlockDialog } from "./raffle-dialogs";
 
 export type DrawSummary = {
   id: string;
@@ -60,6 +61,7 @@ export function RaffleConsole({ draws, draw, stats, winners, names, earlyBirdCut
   const [error, setError] = useState<string | null>(null);
   const [unlocking, setUnlocking] = useState(false);
   const [redrawing, setRedrawing] = useState<DrawWinnerRow | null>(null);
+  const [resetting, setResetting] = useState(false);
 
   const quiz = useQuiz();
 
@@ -176,6 +178,17 @@ export function RaffleConsole({ draws, draw, stats, winners, names, earlyBirdCut
               ? `${money(draw.prize_amount)} · ${draw.winners_count} winners × ${money(draw.prize_amount / draw.winners_count)}`
               : `${money(draw.prize_amount)} · 1 winner`}
           </p>
+
+          {(draw.status !== "open" || current.length > 0) && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => setResetting(true)}
+              className="self-start text-[13px] text-[#c81e1e] underline-offset-4 hover:underline disabled:opacity-50"
+            >
+              Reset this draw…
+            </button>
+          )}
         </section>
 
         {/* Draw column */}
@@ -263,6 +276,20 @@ export function RaffleConsole({ draws, draw, stats, winners, names, earlyBirdCut
             router.refresh();
           }}
           drawId={draw.id}
+        />
+      )}
+      {resetting && (
+        <ResetDialog
+          drawId={draw.id}
+          drawName={draw.name}
+          winnerCount={current.length}
+          onCancel={() => setResetting(false)}
+          onDone={(result) => {
+            setResetting(false);
+            if (result.ok) display.blank();
+            else setError(result.error);
+            router.refresh();
+          }}
         />
       )}
       {redrawing && (
@@ -446,8 +473,9 @@ function WinnersTable({
                     <span className={w.replaced ? "line-through" : ""}>{w.attendee?.name ?? "—"}</span>
                     {w.replaced && w.replace_kind && (
                       <span className="block text-[12px] font-light">
-                        Replaced · {REPLACE_LABELS[w.replace_kind]}
-                        {w.replaced_reason ? `: ${w.replaced_reason}` : ""}
+                        {w.replaced_reason?.startsWith(RESET_PREFIX)
+                          ? `Draw reset · ${w.replaced_reason.slice(RESET_PREFIX.length)}`
+                          : `Replaced · ${REPLACE_LABELS[w.replace_kind]}${w.replaced_reason ? `: ${w.replaced_reason}` : ""}`}
                       </span>
                     )}
                   </td>

@@ -10,11 +10,13 @@ import {
   lockDraw,
   lookupQuizCandidate,
   replaceWinner,
+  resetDraw,
   tagParticipant,
   unlockDraw,
   untagParticipant,
   type Draw,
 } from "./raffle";
+import { RESET_PREFIX } from "./raffle-labels";
 
 // Keys are only present when started with --env-file (npm run test:raffle-db).
 const RUN = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -84,7 +86,7 @@ describe.skipIf(!RUN)("raffle against the real database", () => {
       await admin.from("draws").update({ status: "open", pool_snapshot: null, locked_by: null, locked_at: null }).in("id", drawIds),
     ];
     for (const s of steps) if (s.error) console.error("CLEANUP FAILED:", s.error.message);
-    await admin.from("activity_log").delete().gte("at", started).in("action", ["draw_locked", "draw_unlocked", "winner_drawn", "winner_replaced"]);
+    await admin.from("activity_log").delete().gte("at", started).in("action", ["draw_locked", "draw_unlocked", "winner_drawn", "winner_replaced", "draw_reset"]);
     for (const id of testIds) await admin.from("activity_log").delete().eq("detail->>attendee_id", id);
     await admin.from("attendees").delete().like("client_id", "DRAWTEST-%");
     await Promise.all([boss?.db.auth.signOut(), desk?.db.auth.signOut()]);
@@ -285,6 +287,30 @@ describe.skipIf(!RUN)("raffle against the real database", () => {
     if (!drawn.ok) throw new Error(drawn.error);
     expect(tie.map((c) => test[c])).toContain(drawn.value.winner.attendee_id);
     expect(drawn.value.winner.pool_size).toBe(3);
+  });
+
+  it("reset a draw: winners cancelled (kept on record), draw reopened, those people can win again", async () => {
+    const engagement = draws.engagement.id;
+    const { data: before } = await admin.from("winners").select("id, attendee_id").eq("draw_id", engagement).eq("replaced", false);
+    expect(before!.length).toBe(5);
+
+    expect(await resetDraw(boss.db, admin, boss.id, engagement, "  ")).toEqual({ ok: false, error: "Add a short reason for the reset." });
+    expect((await resetDraw(desk.db, admin, desk.id, engagement, "registrar try")).ok).toBe(false); // RLS hides the draw
+
+    expect(await resetDraw(boss.db, admin, boss.id, engagement, "Projector froze")).toEqual({ ok: true, value: { cancelled: 5 } });
+
+    const { data: after } = await admin.from("winners").select("replaced, replace_kind, replaced_reason").in("id", before!.map((w) => w.id));
+    expect(after).toHaveLength(5); // never deleted
+    expect(after!.every((w) => w.replaced && w.replace_kind === "other" && w.replaced_reason === `${RESET_PREFIX}Projector froze`)).toBe(true);
+    const { data: d } = await admin.from("draws").select("status, pool_snapshot, locked_by").eq("id", engagement).single();
+    expect(d).toEqual({ status: "open", pool_snapshot: null, locked_by: null });
+
+    // A cancelled winner is free again: they can be in a new draw.
+    const freed = Object.entries(test).find(([, id]) => id === before![0]!.attendee_id)![0];
+    expect(await lookupQuizCandidate(boss.db, freed)).toMatchObject({ ok: true, value: { canWin: true } });
+
+    const { count } = await admin.from("activity_log").select("*", { count: "exact", head: true }).eq("action", "draw_reset").gte("at", started);
+    expect(count).toBe(1);
   });
 
   it("across all draws, nobody holds two prizes", async () => {

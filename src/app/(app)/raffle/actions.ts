@@ -9,6 +9,7 @@ import {
   lookupQuizCandidate,
   previewPool,
   replaceWinner,
+  resetDraw,
   tagParticipant,
   unlockDraw,
   untagParticipant,
@@ -87,6 +88,11 @@ export async function confirmQuizResult(drawId: string, clientId: string) {
   const me = await requireSuperAdmin();
   const db = await createClient();
   return toShow(db, await confirmQuizWinner(db, createAdminClient(), me.id, drawId, clientId));
+}
+
+export async function resetDrawFromStart(drawId: string, reason: string) {
+  const me = await requireSuperAdmin();
+  return resetDraw(await createClient(), createAdminClient(), me.id, drawId, reason);
 }
 
 const KINDS: ReplaceKind[] = ["absent", "ineligible", "other"];
