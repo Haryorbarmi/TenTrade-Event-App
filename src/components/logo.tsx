@@ -1,7 +1,8 @@
 /* eslint-disable @next/next/no-img-element -- fixed-size SVG pieces from Figma */
 
 // TenTrade logo, assembled from the Figma SVG pieces exactly as laid out there.
-// "lg" is the Login brand panel (node 4010:138), "sm" the sidebar (node 3943:1281).
+// "lg" is the Login brand panel (node 4010:138), "md" the projector display
+// (node 3953:137), "sm" the sidebar (node 3943:1281).
 
 const WORDMARK_PIECES = [
   "inset-[5.8%_86.05%_0.2%_0]",
@@ -22,6 +23,13 @@ const SIZES = {
     divider: "h-[34.54px] w-[0.921px]",
     wordmark: "h-[30.686px] w-[169.308px]",
   },
+  md: {
+    prefix: "/brand/dp-",
+    gap: "gap-[6px]",
+    mark: "h-[25.537px] w-[31.354px]",
+    divider: "h-[28.783px] w-[0.768px]",
+    wordmark: "h-[25.571px] w-[141.09px]",
+  },
   sm: {
     prefix: "/brand/sb-",
     gap: "gap-[4px]",
@@ -31,7 +39,7 @@ const SIZES = {
   },
 };
 
-export function Logo({ size }: { size: "lg" | "sm" }) {
+export function Logo({ size }: { size: "lg" | "md" | "sm" }) {
   const s = SIZES[size];
   return (
     <div className={`flex items-center ${s.gap}`} role="img" aria-label="TenTrade">

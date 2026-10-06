@@ -24,14 +24,17 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user && request.nextUrl.pathname !== "/login") {
+  if (!user && !PUBLIC_PATHS.has(request.nextUrl.pathname)) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
   return response;
 }
 
+// /display is the projector: it holds no data and only shows what a paired
+// Super Admin screen sends it, so the projector laptop needs no login.
+const PUBLIC_PATHS = new Set(["/login", "/display"]);
+
 export const config = {
-  // Skip static files and Next internals. /display (Phase 4) will be added here
-  // once its pairing model is built.
+  // Skip static files and Next internals.
   matcher: ["/((?!_next/static|_next/image|favicon.ico|brand/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };
