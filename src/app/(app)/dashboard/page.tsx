@@ -7,6 +7,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { KpiCards } from "./kpi-cards";
 import { LiveRefresh } from "./live-refresh";
+import { CheckinsChart } from "./checkins-chart";
+import { DrawsPanel, EligibilityDonut, LatestArrivals } from "./panels";
+
+const DRAW_ORDER = ["grand", "early_bird", "engagement", "knowledge", "lucky"];
 
 export const metadata = { title: "Dashboard · TenTrade Lagos Seminar 2026" };
 
@@ -26,15 +30,17 @@ export default async function DashboardPage() {
   const admin = createAdminClient();
 
   const [{ data: attendees }, { data: settings }, { data: draws }, { data: winners }] = await Promise.all([
-    supabase.from("attendees").select("eligible, tickets, created_at"),
+    supabase.from("attendees").select("seq, client_id, name, eligible, tickets, created_at").order("seq", { ascending: false }),
     supabase.from("event_settings").select("expected_attendees").eq("id", 1).maybeSingle(),
-    admin.from("draws").select("id, status, prize_amount, winners_count"),
+    admin.from("draws").select("id, type, name, status, prize_amount, winners_count"),
     admin.from("winners").select("draw_id").eq("replaced", false),
   ]);
 
   const rows = attendees ?? [];
   const totals = summarize(rows);
-  const peak = peakSlot(arrivalSlots(rows.map((r) => r.created_at)));
+  const slots = arrivalSlots(rows.map((r) => r.created_at));
+  const peak = peakSlot(slots);
+  const orderedDraws = DRAW_ORDER.map((t) => (draws ?? []).find((d) => d.type === t)).filter((d) => !!d);
   const progress = drawProgress(
     (draws ?? []).map((d) => ({ ...d, currentWinners: (winners ?? []).filter((w) => w.draw_id === d.id).length })),
   );
@@ -61,7 +67,14 @@ export default async function DashboardPage() {
         }}
       />
 
-      {/* Panels (check-ins over time, draws, latest arrivals, eligibility donut) come in the next step. */}
+      <div className="flex w-full flex-col gap-[24px] lg:flex-row">
+        <CheckinsChart slots={slots} peakStart={peak?.start ?? null} />
+        <DrawsPanel draws={orderedDraws} />
+      </div>
+      <div className="flex w-full flex-col gap-[24px] lg:flex-row">
+        <LatestArrivals arrivals={rows.slice(0, 4)} />
+        <EligibilityDonut eligible={totals.eligible} total={totals.total} tickets={totals.tickets} />
+      </div>
     </div>
   );
 }
