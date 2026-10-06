@@ -1,7 +1,7 @@
 import { signOut } from "@/app/login/actions";
 import { Logo } from "@/components/logo";
 import { SidebarNav } from "@/components/sidebar-nav";
-import { ROLE_LABELS, type Profile } from "@/lib/roles";
+import { ROLE_LABELS, isSuperAdmin, type Profile } from "@/lib/roles";
 
 function initials(name: string) {
   return name
@@ -43,7 +43,7 @@ export function Sidebar({ profile }: { profile: Profile }) {
           </p>
           <div className="mt-[75px] flex w-full flex-col items-start gap-[15px] [@media(max-height:860px)]:mt-[32px]">
             <p className="w-full border-b border-line p-[10px] text-[14px] font-semibold leading-none text-white">Features</p>
-            <SidebarNav layout="column" />
+            <SidebarNav layout="column" superAdmin={isSuperAdmin(profile)} />
           </div>
           <div className="min-h-[24px] max-h-[178px] flex-1" aria-hidden />
           <div className="flex w-full flex-col items-start gap-[15px]">
@@ -79,7 +79,7 @@ export function Sidebar({ profile }: { profile: Profile }) {
             {logout}
           </div>
         </div>
-        <SidebarNav layout="row" />
+        <SidebarNav layout="row" superAdmin={isSuperAdmin(profile)} />
       </header>
     </>
   );
