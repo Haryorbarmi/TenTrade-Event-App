@@ -16,8 +16,9 @@ create table public.profiles (
   created_at timestamptz not null default now()
 );
 
--- Every new auth user gets a profile. The role comes from app_metadata, which
--- only the service role can set, so a user can never choose their own role.
+-- Every new auth user gets a profile, as a registrar by default. Supabase writes
+-- app_metadata after this trigger runs, so scripts/create-user.mjs sets the role
+-- on the profile explicitly (service role only: users can never set their own).
 create function public.handle_new_user() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin

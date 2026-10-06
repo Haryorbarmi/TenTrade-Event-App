@@ -34,6 +34,9 @@ yarn-error.log*
 .env*
 !.env.example
 
+# generated account passwords, never commit
+user-passwords.txt
+
 # vercel
 .vercel
 

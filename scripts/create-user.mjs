@@ -27,4 +27,12 @@ if (error) {
   console.error(`Failed: ${error.message}`);
   process.exit(1);
 }
+
+// Supabase writes app_metadata after the insert trigger has created the
+// profile, so the trigger always sees no role. Set the role explicitly.
+const { error: roleError } = await admin.from("profiles").update({ role }).eq("id", data.user.id);
+if (roleError) {
+  console.error(`User created but setting the role failed: ${roleError.message}`);
+  process.exit(1);
+}
 console.log(`Created ${role} ${name} <${email}> (${data.user.id})`);
