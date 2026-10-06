@@ -1,4 +1,4 @@
-// Attendee row shapes shared by server pages and live client components.
+// Attendee row shapes and list logic shared by server pages and live client components.
 
 export type RecentRow = {
   id: string;
@@ -13,3 +13,33 @@ export type RecentRow = {
 
 export const RECENT_LIMIT = 10;
 export const RECENT_COLUMNS = "id, seq, client_id, name, eligible, tickets, registered_by, created_at";
+
+export type AttendeeRow = RecentRow & { email: string; phone: string };
+export const ATTENDEE_COLUMNS = `${RECENT_COLUMNS}, email, phone`;
+
+export type AttendeeFilter = {
+  query: string;
+  eligibleOnly: boolean;
+  registeredBy: string | null; // profile id, or null for everyone
+};
+
+// Search by name, email or Client ID (CLAUDE.md section 5), case-insensitive.
+export function filterAttendees<T extends AttendeeRow>(rows: T[], filter: AttendeeFilter): T[] {
+  const q = filter.query.trim().toLowerCase();
+  return rows.filter(
+    (r) =>
+      (!filter.eligibleOnly || r.eligible) &&
+      (!filter.registeredBy || r.registered_by === filter.registeredBy) &&
+      (!q || r.name.toLowerCase().includes(q) || r.email.toLowerCase().includes(q) || r.client_id.toLowerCase().includes(q)),
+  );
+}
+
+// Totals for the whole event, used in the footer and the "Eligible only" chip.
+export function summarize(rows: { eligible: boolean; tickets: number }[]) {
+  const eligible = rows.filter((r) => r.eligible);
+  return {
+    total: rows.length,
+    eligible: eligible.length,
+    tickets: eligible.reduce((sum, r) => sum + r.tickets, 0),
+  };
+}
