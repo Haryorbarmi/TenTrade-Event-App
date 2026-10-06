@@ -5,7 +5,9 @@ import { EligibilityPill, TicketsPill } from "@/components/attendee-pills";
 import { LiveIndicator } from "@/components/live-indicator";
 import { ATTENDEE_COLUMNS, filterAttendees, summarize, type AttendeeRow } from "@/lib/attendees";
 import { formatLagosTime, formatPhone, shortName } from "@/lib/format";
+import { canEditAttendee, isSuperAdmin, type Profile } from "@/lib/roles";
 import { useAttendeesLive } from "@/lib/use-attendees-live";
+import { EditAttendeeDialog } from "./edit-attendee-dialog";
 
 type Registrar = { id: string; name: string };
 
@@ -19,6 +21,7 @@ const COLUMNS = [
   { label: "Tickets", width: "w-[100px]" },
   { label: "Registered by", width: "w-[120px]" },
   { label: "Time", width: "w-[88px]" },
+  { label: "", width: "w-[72px]" }, // Edit
 ];
 
 const chip = "inline-flex h-[34px] items-center whitespace-nowrap rounded-full px-[14px] text-[13px] leading-[normal]";
@@ -26,8 +29,17 @@ const chipOn = `${chip} bg-ink text-white`;
 const chipOff = `${chip} border border-line bg-white text-ink hover:border-ink`;
 
 // Figma: Attendee (3950:194)
-export function AttendeeTable({ initialRows, registrars }: { initialRows: AttendeeRow[]; registrars: Registrar[] }) {
+export function AttendeeTable({
+  initialRows,
+  registrars,
+  viewer,
+}: {
+  initialRows: AttendeeRow[];
+  registrars: Registrar[];
+  viewer: Profile;
+}) {
   const [rows, setRows] = useState(initialRows);
+  const [editing, setEditing] = useState<AttendeeRow | null>(null);
   const [people, setPeople] = useState(registrars);
   const [query, setQuery] = useState("");
   const [eligibleOnly, setEligibleOnly] = useState(false);
@@ -120,7 +132,7 @@ export function AttendeeTable({ initialRows, registrars }: { initialRows: Attend
 
       <div className="w-full overflow-hidden rounded-[12px] border border-line bg-white">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1000px] table-fixed border-collapse text-left">
+          <table className="w-full min-w-[1080px] table-fixed border-collapse text-left">
             <thead className="bg-surface">
               <tr>
                 {COLUMNS.map((c, i) => (
@@ -155,7 +167,19 @@ export function AttendeeTable({ initialRows, registrars }: { initialRows: Attend
                     <TicketsPill tickets={r.tickets} />
                   </td>
                   <td className="truncate pr-2 font-light">{shortName(nameOf[r.registered_by] ?? "…")}</td>
-                  <td className="whitespace-nowrap pr-[24px] font-light">{formatLagosTime(r.created_at)}</td>
+                  <td className="whitespace-nowrap pr-2 font-light">{formatLagosTime(r.created_at)}</td>
+                  <td className="pr-[24px] text-right">
+                    {canEditAttendee(viewer, r) && (
+                      <button
+                        type="button"
+                        onClick={() => setEditing(r)}
+                        aria-label={`Edit No. ${r.seq}, ${r.name}`}
+                        className="rounded-[6px] px-[8px] py-[4px] text-[13px] text-accent hover:bg-accent/10"
+                      >
+                        Edit
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
               {shown.length === 0 && (
@@ -173,6 +197,16 @@ export function AttendeeTable({ initialRows, registrars }: { initialRows: Attend
           {totals.tickets === 1 ? "" : "s"} in the Grand Draw
         </p>
       </div>
+
+      {editing && (
+        <EditAttendeeDialog
+          key={editing.id}
+          attendee={editing}
+          names={nameOf}
+          canSeeHistory={isSuperAdmin(viewer)}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </>
   );
 }

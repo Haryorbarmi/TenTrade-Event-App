@@ -22,7 +22,22 @@ export type CleanAttendee = {
   tickets: number;
 };
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+export function attendeeFromForm(formData: FormData): AttendeeInput {
+  const eligible = formData.get("eligible");
+  return {
+    clientId: String(formData.get("clientId") ?? ""),
+    name: String(formData.get("name") ?? ""),
+    email: String(formData.get("email") ?? ""),
+    phone: String(formData.get("phone") ?? ""),
+    eligible: eligible === "yes" ? true : eligible === "no" ? false : null,
+    tickets: Number(formData.get("tickets") ?? 0),
+  };
+}
+
+export const duplicateClientIdMessage = (clientId: string) =>
+  `Client ID ${clientId} is already registered. Each client can only be added once.`;
+
+const EMAIL_RE =/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 // Nigerian mobile numbers: 080..., 0803 ..., +234 803 ..., 234803...
 // Returns the number as +234XXXXXXXXXX, or null if it is not valid.
