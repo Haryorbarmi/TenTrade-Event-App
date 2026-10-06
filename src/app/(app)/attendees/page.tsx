@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/auth";
 import { ATTENDEE_COLUMNS, type AttendeeRow } from "@/lib/attendees";
+import { canExportAttendees } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { AttendeeTable } from "./attendee-table";
 
@@ -21,7 +22,16 @@ export default async function AttendeesPage() {
           <h1 className="font-heading text-[30px] leading-[normal] text-ink">Attendee</h1>
           <p className="text-[14px] font-light leading-[normal] text-muted">Everyone who has checked in, in arrival order.</p>
         </div>
-        {/* Export to Excel (Super Admin only) is added in a later step. */}
+        {canExportAttendees(viewer) && (
+          // Plain link: the browser downloads the file. The route re-checks the role.
+          <a
+            href="/attendees/export"
+            download
+            className="flex h-[44px] shrink-0 items-center justify-center rounded-[8px] border border-line bg-white px-[20px] text-[14px] text-ink hover:border-ink"
+          >
+            Export to Excel
+          </a>
+        )}
       </header>
 
       <AttendeeTable initialRows={(rows ?? []) as AttendeeRow[]} registrars={profiles ?? []} viewer={viewer} />
