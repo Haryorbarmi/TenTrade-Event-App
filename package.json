@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "create-user": "node --env-file=.env.local scripts/create-user.mjs",
-    "check-rls": "node --env-file=.env.local scripts/check-rls.mjs"
+    "check-rls": "node --env-file=.env.local scripts/check-rls.mjs",
+    "test:db": "node --env-file=.env.local scripts/test-registration-db.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
