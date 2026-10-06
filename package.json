@@ -10,7 +10,8 @@
     "test": "vitest run",
     "create-user": "node --env-file=.env.local scripts/create-user.mjs",
     "check-rls": "node --env-file=.env.local scripts/check-rls.mjs",
-    "test:db": "node --env-file=.env.local scripts/test-registration-db.mjs"
+    "test:db": "node --env-file=.env.local scripts/test-registration-db.mjs",
+    "test:raffle-db": "node --env-file=.env.local node_modules/vitest/vitest.mjs run src/lib/raffle.db.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

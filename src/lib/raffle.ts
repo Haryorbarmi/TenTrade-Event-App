@@ -13,7 +13,7 @@ import {
   type DrawType,
   type PoolCandidate,
   type PoolEntry,
-} from "@/lib/draw-engine";
+} from "./draw-engine";
 
 export type Draw = {
   id: string;
