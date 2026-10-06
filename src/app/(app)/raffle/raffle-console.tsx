@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { DrawType } from "@/lib/draw-engine";
 import { formatLagosTime, shortName } from "@/lib/format";
-import { drawNextWinner, lockDrawList } from "./actions";
+import { confirmQuizResult, drawNextWinner, lockDrawList } from "./actions";
+import { QuizResultSetup, QuizStage, useQuiz } from "./knowledge-panel";
 import { ParticipantTags, type Participant } from "./participant-tags";
 import { RedrawDialog, UnlockDialog } from "./raffle-dialogs";
 
@@ -38,10 +39,6 @@ export type PoolStats = { people: number; entries: number; remaining: number };
 
 const money = (n: number) => `$${n.toLocaleString("en-US")}`;
 const REPLACE_LABELS = { absent: "Absent", ineligible: "Not eligible", other: "Other" } as const;
-// Built in the next step: the quiz winner flow.
-const NOT_READY: Partial<Record<DrawType, string>> = {
-  knowledge: "Confirming the quiz winner (and tie-breaks) is added in the next step.",
-};
 
 type Props = {
   draws: DrawSummary[];
@@ -61,10 +58,13 @@ export function RaffleConsole({ draws, draw, stats, winners, names, earlyBirdCut
   const [unlocking, setUnlocking] = useState(false);
   const [redrawing, setRedrawing] = useState<DrawWinnerRow | null>(null);
 
+  const quiz = useQuiz();
+
   const current = winners.filter((w) => !w.replaced);
   const latest = current.at(-1);
-  const notReady = NOT_READY[draw.type];
   const weighted = draw.type === "grand";
+  // Knowledge Challenge has its own "Quiz result" flow until a tie list is locked.
+  const quizOpen = draw.type === "knowledge" && draw.status === "open";
 
   function run(action: () => Promise<{ ok: boolean; error?: string }>) {
     setError(null);
@@ -132,46 +132,21 @@ export function RaffleConsole({ draws, draw, stats, winners, names, earlyBirdCut
           </p>
 
           <div className="h-px w-full bg-line" />
-          <h2 className="text-[16px] font-semibold leading-[normal] text-ink">2. Lock the list</h2>
-          <div className="flex w-full items-center justify-between gap-3">
-            <div className="flex items-center gap-[8px]">
-              <img
-                alt=""
-                width={10}
-                height={10}
-                className="block size-[10px]"
-                src={draw.status === "open" ? "/brand/dot-not-eligible.svg" : "/brand/dot-locked.svg"}
-              />
-              <div className="flex flex-col gap-[2px] leading-[normal]">
-                <span className="text-[14px] font-semibold text-ink">{draw.status === "open" ? "Not locked" : "Locked"}</span>
-                <span className="text-[12px] font-light text-muted">
-                  {draw.status === "open" || !draw.locked_at
-                    ? "Preview the pool above, then lock it."
-                    : `${formatLagosTime(draw.locked_at)} · by ${shortName(names[draw.locked_by ?? ""] ?? "…")}`}
-                </span>
-              </div>
-            </div>
-            {draw.status === "open" ? (
-              <button
-                type="button"
-                disabled={pending || !!notReady || stats.people === 0}
-                onClick={() => run(() => lockDrawList(draw.id))}
-                className="bg-accent-gradient flex h-[36px] shrink-0 items-center justify-center rounded-[8px] px-[20px] text-[14px] font-semibold text-white disabled:opacity-50"
-              >
-                Lock the list
-              </button>
-            ) : draw.status === "locked" ? (
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => setUnlocking(true)}
-                className="flex h-[36px] shrink-0 items-center justify-center rounded-[8px] border border-line bg-white px-[20px] text-[14px] text-ink hover:border-ink"
-              >
-                Unlock
-              </button>
-            ) : null}
-          </div>
-          {notReady && <p className="text-[12px] font-light leading-[normal] text-muted">{notReady}</p>}
+          <h2 className="text-[16px] font-semibold leading-[normal] text-ink">
+            {draw.type === "knowledge" ? "2. Quiz result" : "2. Lock the list"}
+          </h2>
+          {quizOpen ? (
+            <QuizResultSetup quiz={quiz} pending={pending} onLockTie={(ids) => run(() => lockDrawList(draw.id, ids))} />
+          ) : (
+            <LockStatus
+              draw={draw}
+              lockedByName={names[draw.locked_by ?? ""]}
+              canLock={!pending && stats.people > 0}
+              pending={pending}
+              onLock={() => run(() => lockDrawList(draw.id))}
+              onUnlock={() => setUnlocking(true)}
+            />
+          )}
 
           <div className="h-px w-full bg-line" />
           <h2 className="text-[16px] font-semibold leading-[normal] text-ink">3. Prize</h2>
@@ -184,31 +159,40 @@ export function RaffleConsole({ draws, draw, stats, winners, names, earlyBirdCut
 
         {/* Draw column */}
         <div className="flex w-full min-w-px flex-1 flex-col gap-[24px]">
-          <section className="flex w-full flex-col items-center gap-[16px] rounded-[12px] bg-ink px-6 py-[36px] text-center md:px-[32px]">
-            <p className="text-[14px] leading-[normal] text-accent-from">
-              {draw.name} · {stageLabel}
-            </p>
-            <p className="font-heading text-[48px] leading-[normal] text-white/90 md:text-[72px]" aria-live="polite">
-              {latest?.attendee?.client_id ?? "- - - - -"}
-            </p>
-            {latest?.attendee && <p className="-mt-[8px] text-[18px] font-semibold text-white">{latest.attendee.name}</p>}
-            <button
-              type="button"
-              disabled={pending || draw.status !== "locked"}
-              onClick={() => run(() => drawNextWinner(draw.id))}
-              className="bg-accent-gradient flex h-[52px] w-full max-w-[300px] items-center justify-center rounded-[8px] text-[14px] font-semibold text-white disabled:opacity-40"
-            >
-              {pending ? "Drawing…" : drawLabel}
-            </button>
-            <div className="flex gap-[24px] text-[13px] leading-[normal]">
-              <Stat label={weighted ? "Tickets" : "Pool"} value={weighted ? stats.entries : stats.people} />
-              <Stat
-                label="Drawn"
-                value={draw.winners_count > 1 ? `${current.length} / ${draw.winners_count}` : current.length}
-              />
-              <Stat label="Remaining" value={stats.remaining} />
-            </div>
-          </section>
+          {quizOpen ? (
+            <QuizStage
+              quiz={quiz}
+              drawName={draw.name}
+              pending={pending}
+              onConfirm={(clientId) => run(() => confirmQuizResult(draw.id, clientId))}
+            />
+          ) : (
+            <section className="flex w-full flex-col items-center gap-[16px] rounded-[12px] bg-ink px-6 py-[36px] text-center md:px-[32px]">
+              <p className="text-[14px] leading-[normal] text-accent-from">
+                {draw.name} · {stageLabel}
+              </p>
+              <p className="font-heading text-[48px] leading-[normal] text-white/90 md:text-[72px]" aria-live="polite">
+                {latest?.attendee?.client_id ?? "- - - - -"}
+              </p>
+              {latest?.attendee && <p className="-mt-[8px] text-[18px] font-semibold text-white">{latest.attendee.name}</p>}
+              <button
+                type="button"
+                disabled={pending || draw.status !== "locked"}
+                onClick={() => run(() => drawNextWinner(draw.id))}
+                className="bg-accent-gradient flex h-[52px] w-full max-w-[300px] items-center justify-center rounded-[8px] text-[14px] font-semibold text-white disabled:opacity-40"
+              >
+                {pending ? "Drawing…" : drawLabel}
+              </button>
+              <div className="flex gap-[24px] text-[13px] leading-[normal]">
+                <Stat label={weighted ? "Tickets" : "Pool"} value={weighted ? stats.entries : stats.people} />
+                <Stat
+                  label="Drawn"
+                  value={draw.winners_count > 1 ? `${current.length} / ${draw.winners_count}` : current.length}
+                />
+                <Stat label="Remaining" value={stats.remaining} />
+              </div>
+            </section>
+          )}
 
           {error && (
             <p role="alert" className="w-full rounded-[8px] bg-[#c81e1e]/10 px-[14px] py-[10px] text-[13px] text-ink">
@@ -221,6 +205,7 @@ export function RaffleConsole({ draws, draw, stats, winners, names, earlyBirdCut
             names={names}
             weighted={weighted}
             winnersCount={draw.winners_count}
+            emptyText={draw.type === "knowledge" ? "No winner yet. The winner appears here once confirmed." : undefined}
             onRedraw={setRedrawing}
             disabled={pending}
           />
@@ -251,6 +236,58 @@ export function RaffleConsole({ draws, draw, stats, winners, names, earlyBirdCut
           }}
         />
       )}
+    </div>
+  );
+}
+
+function LockStatus({
+  draw,
+  lockedByName,
+  canLock,
+  pending,
+  onLock,
+  onUnlock,
+}: {
+  draw: DrawDetail;
+  lockedByName: string | undefined;
+  canLock: boolean;
+  pending: boolean;
+  onLock: () => void;
+  onUnlock: () => void;
+}) {
+  const open = draw.status === "open";
+  return (
+    <div className="flex w-full items-center justify-between gap-3">
+      <div className="flex items-center gap-[8px]">
+        <img alt="" width={10} height={10} className="block size-[10px]" src={open ? "/brand/dot-not-eligible.svg" : "/brand/dot-locked.svg"} />
+        <div className="flex flex-col gap-[2px] leading-[normal]">
+          <span className="text-[14px] font-semibold text-ink">{open ? "Not locked" : "Locked"}</span>
+          <span className="text-[12px] font-light text-muted">
+            {open || !draw.locked_at
+              ? "Preview the pool above, then lock it."
+              : `${formatLagosTime(draw.locked_at)} · by ${shortName(lockedByName ?? "…")}`}
+          </span>
+        </div>
+      </div>
+      {open ? (
+        <button
+          type="button"
+          disabled={!canLock}
+          onClick={onLock}
+          className="bg-accent-gradient flex h-[36px] shrink-0 items-center justify-center rounded-[8px] px-[20px] text-[14px] font-semibold text-white disabled:opacity-50"
+        >
+          Lock the list
+        </button>
+      ) : draw.status === "locked" ? (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={onUnlock}
+          className="flex h-[36px] shrink-0 items-center justify-center rounded-[8px] border border-line bg-white px-[20px] text-[14px] text-ink hover:border-ink"
+        >
+          Unlock
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -312,7 +349,9 @@ function PoolSummary({
         equal,
       );
     case "knowledge":
-      return box("Quiz winner", "Decided by the quiz. Enter the top scorer's Client ID to confirm.");
+      return draw.status === "locked"
+        ? box(`${people(stats.people, "tied client")} locked`, "Tie at the top score: one is drawn at random.", equal)
+        : box("Winner decided by the quiz", "Run the quiz in your quiz tool, then record the top scorer here.");
   }
 }
 
@@ -321,6 +360,7 @@ function WinnersTable({
   names,
   weighted,
   winnersCount,
+  emptyText,
   onRedraw,
   disabled,
 }: {
@@ -328,6 +368,7 @@ function WinnersTable({
   names: Record<string, string>;
   weighted: boolean;
   winnersCount: number;
+  emptyText?: string;
   onRedraw: (w: DrawWinnerRow) => void;
   disabled: boolean;
 }) {
@@ -337,9 +378,10 @@ function WinnersTable({
       <h2 className="px-[24px] py-[20px] text-[16px] font-semibold leading-[normal] text-ink">Winners</h2>
       {ordered.length === 0 ? (
         <p className="px-[24px] pb-[24px] text-[14px] font-light leading-[normal] text-muted">
-          {winnersCount > 1
-            ? `No winners yet. The ${winnersCount} winners appear here, one at a time.`
-            : "No winners yet. Winners appear here after each draw."}
+          {emptyText ??
+            (winnersCount > 1
+              ? `No winners yet. The ${winnersCount} winners appear here, one at a time.`
+              : "No winners yet. Winners appear here after each draw.")}
         </p>
       ) : (
         <div className="overflow-x-auto">

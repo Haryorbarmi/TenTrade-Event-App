@@ -4,7 +4,17 @@
 import { readFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { drawWinner, lockDraw, replaceWinner, tagParticipant, unlockDraw, untagParticipant, type Draw } from "./raffle";
+import {
+  confirmQuizWinner,
+  drawWinner,
+  lockDraw,
+  lookupQuizCandidate,
+  replaceWinner,
+  tagParticipant,
+  unlockDraw,
+  untagParticipant,
+  type Draw,
+} from "./raffle";
 
 // Keys are only present when started with --env-file (npm run test:raffle-db).
 const RUN = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -44,8 +54,9 @@ describe.skipIf(!RUN)("raffle against the real database", () => {
 
     boss = await signIn("ayobami@tentrade.com");
     desk = await signIn("eniolao@tentrade.com");
-    // 10 test attendees; T1-T4 eligible for the Grand Draw.
-    for (let i = 1; i <= 10; i++) {
+    // 14 test attendees; T1-T4 eligible for the Grand Draw. T11-T14 are kept
+    // out of the earlier draws so the Knowledge Challenge test has free clients.
+    for (let i = 1; i <= 14; i++) {
       const { data, error } = await boss.db
         .from("attendees")
         .insert({
@@ -230,6 +241,50 @@ describe.skipIf(!RUN)("raffle against the real database", () => {
     if (!client) return; // the Grand winner was a real attendee, not a test one; nothing more to check
     const lock = await lockDraw(boss.db, admin, boss.id, draws.knowledge.id, { tiedClientIds: [client] });
     expect(lock.ok && lock.value.entries.map((e) => e.attendee_id)).toEqual([grand!.attendee_id]);
+  });
+
+  it("Knowledge Challenge: look up, confirm a single winner, replace, then a tie-break draw", async () => {
+    const knowledge = draws.knowledge.id;
+    const { data: k } = await admin.from("draws").select("status").eq("id", knowledge).single();
+    if (k!.status === "locked") expect((await unlockDraw(boss.db, admin, boss.id, knowledge)).ok).toBe(true);
+
+    // Look-up.
+    expect((await lookupQuizCandidate(boss.db, "NOPE-404")).ok).toBe(false);
+    expect(await lookupQuizCandidate(boss.db, "DRAWTEST-1")).toMatchObject({ ok: true, value: { canWin: false } }); // Lucky winner
+
+    // A previous winner cannot be confirmed, and the draw stays open.
+    expect(await confirmQuizWinner(boss.db, admin, boss.id, knowledge, "DRAWTEST-1")).toEqual({
+      ok: false,
+      error: "This client has already won a prize or was found absent.",
+    });
+    expect((await admin.from("draws").select("status").eq("id", knowledge).single()).data!.status).toBe("open");
+
+    // Pick test clients who can still win.
+    const { data: gone } = await admin.from("winners").select("attendee_id").or("replaced.eq.false,replace_kind.eq.absent");
+    const goneIds = new Set(gone!.map((w) => w.attendee_id));
+    const free = Object.keys(test).filter((c) => !goneIds.has(test[c]!));
+    expect(free.length).toBeGreaterThanOrEqual(4);
+
+    // Single winner: pool of exactly one, draw complete.
+    expect(await lookupQuizCandidate(boss.db, free[0]!)).toMatchObject({ ok: true, value: { canWin: true } });
+    const single = await confirmQuizWinner(boss.db, admin, boss.id, knowledge, ` ${free[0]} `);
+    if (!single.ok) throw new Error(single.error);
+    expect(single.value.winner).toMatchObject({ attendee_id: test[free[0]!], pool_size: 1, random_value: 0 });
+    expect(single.value.complete).toBe(true);
+
+    // Replacing the quiz winner reopens the draw fully (not the one-person snapshot).
+    expect((await replaceWinner(boss.db, admin, boss.id, single.value.winner.id, "ineligible", "Wrong answer sheet")).ok).toBe(true);
+    const { data: reopened } = await admin.from("draws").select("status, pool_snapshot").eq("id", knowledge).single();
+    expect(reopened).toEqual({ status: "open", pool_snapshot: null });
+
+    // Tie-break between three clients.
+    const tie = free.slice(1, 4);
+    const lock = await lockDraw(boss.db, admin, boss.id, knowledge, { tiedClientIds: tie });
+    expect(lock.ok && lock.value.entries.map((e) => e.client_id).sort()).toEqual([...tie].sort());
+    const drawn = await drawWinner(boss.db, admin, boss.id, knowledge);
+    if (!drawn.ok) throw new Error(drawn.error);
+    expect(tie.map((c) => test[c])).toContain(drawn.value.winner.attendee_id);
+    expect(drawn.value.winner.pool_size).toBe(3);
   });
 
   it("across all draws, nobody holds two prizes", async () => {

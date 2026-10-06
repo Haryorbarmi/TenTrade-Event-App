@@ -222,6 +222,47 @@ export async function untagParticipant(db: SupabaseClient, attendeeId: string): 
   return error ? fail("Could not remove. Try again.") : { ok: true, value: null };
 }
 
+// Knowledge Challenge. The quiz runs outside the app; the Super Admin records the top scorer.
+export type QuizCandidate = { client_id: string; name: string; canWin: boolean; reason: string | null };
+
+export async function lookupQuizCandidate(db: SupabaseClient, clientId: string): Promise<Result<QuizCandidate>> {
+  const id = clientId.trim();
+  if (!id) return fail("Enter the top scorer's Client ID.");
+  const { data: attendee } = await db.from("attendees").select("id, client_id, name").eq("client_id", id).maybeSingle();
+  if (!attendee) return fail(`No attendee with Client ID ${id}. Only checked-in clients can win.`);
+  const excluded = (await excludedAttendeeIds(db)).has(attendee.id);
+  return {
+    ok: true,
+    value: {
+      client_id: attendee.client_id,
+      name: attendee.name,
+      canWin: !excluded,
+      reason: excluded ? "Already won a prize or was found absent" : null,
+    },
+  };
+}
+
+// Confirm a single quiz winner: a locked pool of exactly one person, then the
+// normal draw, so the result gets the same audit trail and one-prize protection.
+export async function confirmQuizWinner(
+  db: SupabaseClient,
+  admin: SupabaseClient,
+  actor: string,
+  drawId: string,
+  clientId: string,
+): Promise<Result<{ winner: Winner; complete: boolean }>> {
+  const draw = await loadDraw(db, drawId);
+  if (!draw || draw.type !== "knowledge") return fail("Draw not found.");
+
+  const lock = await lockDraw(db, admin, actor, drawId, { tiedClientIds: [clientId.trim()] });
+  if (!lock.ok) {
+    return fail(lock.error.startsWith("Nobody") ? "This client has already won a prize or was found absent." : lock.error);
+  }
+  const result = await drawWinner(db, admin, actor, drawId);
+  if (!result.ok) await unlockDraw(db, admin, actor, drawId); // put it back as it was
+  return result;
+}
+
 export type ReplaceKind = "absent" | "ineligible" | "other";
 
 // Redraw, part 1: mark a winner as replaced (never deleted or overwritten) and
@@ -252,7 +293,14 @@ export async function replaceWinner(
   if (error || !data?.length) return fail("Could not replace this winner. Refresh and try again.");
 
   // A completed draw has a free slot again, so it goes back to locked (same snapshot).
-  await db.from("draws").update({ status: "locked" }).eq("id", winner.draw_id).eq("status", "done");
+  // The Knowledge Challenge reopens fully instead: its pool was the quiz winner
+  // (or the tie list) the admin entered, so they record the result again.
+  const { data: draw } = await db.from("draws").select("type").eq("id", winner.draw_id).single();
+  if (draw?.type === "knowledge") {
+    await db.from("draws").update({ status: "open", pool_snapshot: null, locked_by: null, locked_at: null }).eq("id", winner.draw_id);
+  } else {
+    await db.from("draws").update({ status: "locked" }).eq("id", winner.draw_id).eq("status", "done");
+  }
 
   await log(admin, actor, "winner_replaced", {
     draw_id: winner.draw_id,

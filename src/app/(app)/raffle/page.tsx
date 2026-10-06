@@ -58,6 +58,7 @@ export default async function RafflePage({ searchParams }: PageProps<"/raffle">)
 
   return (
     <RaffleConsole
+      key={draw.id}
       draws={draws.map(({ id, type, name, prize_amount, winners_count, status }) => ({ id, type, name, prize_amount, winners_count, status }))}
       draw={{
         id: draw.id,

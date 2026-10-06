@@ -2,8 +2,10 @@
 
 import { requireSuperAdmin } from "@/lib/auth";
 import {
+  confirmQuizWinner,
   drawWinner,
   lockDraw,
+  lookupQuizCandidate,
   previewPool,
   replaceWinner,
   tagParticipant,
@@ -48,6 +50,16 @@ export async function addParticipant(clientId: string) {
 export async function removeParticipant(attendeeId: string) {
   await requireSuperAdmin();
   return untagParticipant(await createClient(), attendeeId);
+}
+
+export async function lookupQuizWinner(clientId: string) {
+  await requireSuperAdmin();
+  return lookupQuizCandidate(await createClient(), clientId);
+}
+
+export async function confirmQuizResult(drawId: string, clientId: string) {
+  const me = await requireSuperAdmin();
+  return confirmQuizWinner(await createClient(), createAdminClient(), me.id, drawId, clientId);
 }
 
 const KINDS: ReplaceKind[] = ["absent", "ineligible", "other"];
