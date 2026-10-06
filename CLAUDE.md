@@ -224,7 +224,7 @@ Work one phase at a time. Finish and check each phase before the next. Read the 
 
 1. Ticket rounding: round down to the nearest $100. **Confirmed by owner 2026-10-06** ($99 = not eligible, $250 = 2, $1,000+ = 10).
 2. Whether registrars may edit their own entries. **Confirmed by owner 2026-10-06:** yes, own entries only, with the audit log.
-3. Whether the Super Admin can edit the countdown length (assumed yes, default 10 seconds).
+3. Whether the Super Admin can edit the countdown length. **Confirmed by owner 2026-10-06:** yes, editable before each draw, default 10 seconds.
 4. Early Bird means the first 50 clients registered at the venue, in arrival order. **Confirmed by owner 2026-10-06:** arrival numbers 1 to 50, regardless of Grand Draw eligibility.
 5. Draw order for the five prizes. **Confirmed by owner 2026-10-06:** no fixed order; the programme decides on the day, and any draw can run first or last. The app must allow any order and must always remove every previous winner from every later draw's pool.
 6. The "of N expected" number on the Dashboard, and where it comes from.
