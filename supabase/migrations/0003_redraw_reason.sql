@@ -6,6 +6,7 @@ alter table public.winners
   add column if not exists replace_kind text
   check (replace_kind in ('absent', 'ineligible', 'other'));
 
+alter table public.winners drop constraint if exists winners_replaced_has_kind;
 alter table public.winners
   add constraint winners_replaced_has_kind
   check (not replaced or replace_kind is not null);
