@@ -222,8 +222,8 @@ Work one phase at a time. Finish and check each phase before the next. Read the 
 
 ## 13. Open items to confirm with the owner
 
-1. Ticket rounding: round down to the nearest $100 (assumed).
-2. Whether registrars may edit their own entries (assumed yes, with the audit log).
+1. Ticket rounding: round down to the nearest $100. **Confirmed by owner 2026-10-06** ($99 = not eligible, $250 = 2, $1,000+ = 10).
+2. Whether registrars may edit their own entries. **Confirmed by owner 2026-10-06:** yes, own entries only, with the audit log.
 3. Whether the Super Admin can edit the countdown length (assumed yes, default 10 seconds).
 4. Early Bird means the first 50 clients registered at the venue, in arrival order (assumed).
 5. Draw order for the five prizes.
