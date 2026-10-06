@@ -49,7 +49,7 @@ async function loadDraw(db: SupabaseClient, drawId: string): Promise<Draw | null
 
 // Everyone who can no longer win anything: current prize holders (one prize per
 // attendee) and winners replaced because they were absent (not in the room).
-async function excludedAttendeeIds(db: SupabaseClient): Promise<Set<string>> {
+export async function excludedAttendeeIds(db: SupabaseClient): Promise<Set<string>> {
   const { data, error } = await db.from("winners").select("attendee_id").or("replaced.eq.false,replace_kind.eq.absent");
   if (error) throw new Error(`Could not load winners: ${error.message}`);
   return new Set((data ?? []).map((w) => w.attendee_id));
