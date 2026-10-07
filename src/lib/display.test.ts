@@ -1,41 +1,56 @@
 import { describe, expect, it } from "vitest";
-import { SETTLE_MS, SHUFFLE_MS, expandPool, practiceRound, shuffleFrame } from "./display";
+import { SETTLE_MS, SHUFFLE_MS, practiceRound, shuffleFrame, shuffleOrder } from "./display";
 
-describe("expandPool", () => {
-  it("repeats each Client ID once per ticket so bigger holders appear more often", () => {
-    const ids = expandPool([
-      { id: "10482", w: 3 },
-      { id: "10517", w: 1 },
+describe("shuffleOrder", () => {
+  it("lists every Client ID in the pool exactly once, whatever its tickets", () => {
+    const order = shuffleOrder([
+      { id: "104820", w: 3 },
+      { id: "105170", w: 1 },
+      { id: "105171", w: 10 },
     ]);
-    expect(ids.filter((i) => i === "10482")).toHaveLength(3);
-    expect(ids.filter((i) => i === "10517")).toHaveLength(1);
+    expect([...order].sort()).toEqual(["104820", "105170", "105171"]);
+  });
+
+  it("is in a different order from one draw to the next", () => {
+    const pool = Array.from({ length: 50 }, (_, i) => ({ id: String(100000 + i), w: 1 }));
+    expect(shuffleOrder(pool).join()).not.toBe(shuffleOrder(pool).join());
   });
 });
 
 describe("shuffleFrame", () => {
-  const ids = ["11111", "22222", "33333"];
+  const order = ["11111", "22222", "33333"];
   const winner = "10482";
 
-  it("shows a whole random pool ID (changing in place) before the settle", () => {
-    const frame = shuffleFrame(ids, winner, 1000, () => 0.5).join("");
-    expect(frame).toBe("22222");
+  it("shows the next pool ID on each frame, wrapping round", () => {
+    const shown = [0, 1, 2, 3, 4].map((f) => shuffleFrame(order, winner, 1000, f).join(""));
+    expect(shown).toEqual(["11111", "22222", "33333", "11111", "22222"]);
+  });
+
+  it("reads through every ID in the pool well within the 15 seconds", () => {
+    // 250 attendees at a slow 30 frames a second: frames available before the settle.
+    const pool = Array.from({ length: 250 }, (_, i) => ({ id: String(100000 + i * 3), w: 1 + (i % 10) }));
+    const big = shuffleOrder(pool);
+    const frames = Math.floor(((SHUFFLE_MS - SETTLE_MS) / 1000) * 30);
+    const seen = new Set<string>();
+    for (let f = 0; f < frames; f++) seen.add(shuffleFrame(big, "999999", (f / frames) * (SHUFFLE_MS - SETTLE_MS), f).join(""));
+    expect(seen.size).toBe(250);
   });
 
   it("settles left to right during the last 2 seconds", () => {
     const start = SHUFFLE_MS - SETTLE_MS;
-    const r = () => 0; // always picks "11111"
-    expect(shuffleFrame(ids, winner, start + SETTLE_MS * 0.2, r).join("")).toBe("11111"); // first box settled on "1"
-    expect(shuffleFrame(ids, winner, start + SETTLE_MS * 0.4, r).join("")).toBe("10111");
-    expect(shuffleFrame(ids, winner, start + SETTLE_MS * 0.8, r).join("")).toBe("10481");
+    const r = () => 0; // digit fill never needed here: pool IDs are as long as the winner
+    expect(shuffleFrame(order, winner, start + SETTLE_MS * 0.2, 0, r).join("")).toBe("11111"); // first box settled on "1"
+    expect(shuffleFrame(order, winner, start + SETTLE_MS * 0.4, 0, r).join("")).toBe("10111");
+    expect(shuffleFrame(order, winner, start + SETTLE_MS * 0.8, 0, r).join("")).toBe("10481");
   });
 
   it("always ends exactly on the winner", () => {
-    expect(shuffleFrame(ids, winner, SHUFFLE_MS).join("")).toBe(winner);
-    expect(shuffleFrame(ids, winner, SHUFFLE_MS + 5000).join("")).toBe(winner);
+    expect(shuffleFrame(order, winner, SHUFFLE_MS, 7).join("")).toBe(winner);
+    expect(shuffleFrame(order, winner, SHUFFLE_MS + 5000, 99).join("")).toBe(winner);
   });
 
   it("fills with digits when pool IDs are shorter than the winner's", () => {
-    const frame = shuffleFrame(["12"], "1048200", 0, () => 0);
+    const frame = shuffleFrame(["12"], "1048200", 0, 0, () => 0);
     expect(frame).toHaveLength(7);
     expect(frame.join("")).toMatch(/^12\d{5}$/);
   });
@@ -55,7 +70,7 @@ describe("practiceRound", () => {
     for (let i = 0; i < 20; i++) {
       const [, , shuffle, winner] = practiceRound();
       if (shuffle!.kind !== "shuffling" || winner!.kind !== "winner") throw new Error("unexpected states");
-      const settled = shuffleFrame(expandPool(shuffle!.pool), shuffle!.winner.clientId, SHUFFLE_MS).join("");
+      const settled = shuffleFrame(shuffleOrder(shuffle!.pool), shuffle!.winner.clientId, SHUFFLE_MS, 0).join("");
       expect(winner!.clientId).toBe(settled);
       expect(shuffle!.pool.map((p) => p.id)).toContain(settled); // a real ID from the pool
     }

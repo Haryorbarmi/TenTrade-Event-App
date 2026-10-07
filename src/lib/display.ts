@@ -10,9 +10,10 @@ export type DisplayState =
   | { kind: "shuffling"; label: string; pool: DisplayPoolEntry[]; winner: { clientId: string; name: string } }
   | { kind: "winner"; label: string; clientId: string; name: string };
 
-export const SHUFFLE_MS = 6000; // whole shuffle, including the settle
+export const SHUFFLE_MS = 15000; // whole shuffle, including the settle
 export const SETTLE_MS = 2000; // last 2 seconds: digits settle left to right
-export const SHUFFLE_TICK_MS = 90;
+// The shuffle swaps to the next Client ID on every screen refresh (about 60 a
+// second), too fast to count.
 
 // Short names used on the projector ("WINNER · GRAND DRAW").
 export const DISPLAY_LABELS: Record<string, string> = {
@@ -23,22 +24,36 @@ export const DISPLAY_LABELS: Record<string, string> = {
   knowledge: "Knowledge Challenge",
 };
 
-// One entry per ticket, so clients with more tickets appear more often in the
-// shuffle (Grand Draw). Purely visual: the winner is already chosen on the server.
-export function expandPool(pool: DisplayPoolEntry[]): string[] {
-  return pool.flatMap((e) => Array.from({ length: Math.max(1, e.w) }, () => e.id));
+// Every Client ID in the pool exactly once, in a random order. The shuffle walks
+// through this list, so every ID is shown in turn (none skipped, none missed by
+// bad luck). Purely visual: the winner is already chosen on the server.
+export function shuffleOrder(pool: DisplayPoolEntry[], random: () => number = Math.random): string[] {
+  const ids = [...new Set(pool.map((e) => e.id))];
+  for (let i = ids.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [ids[i], ids[j]] = [ids[j]!, ids[i]!];
+  }
+  return ids;
 }
 
 const DIGITS = "0123456789";
 
-// What the digit boxes show `elapsed` ms into the shuffle. The whole ID changes
-// in place; in the last SETTLE_MS the boxes lock onto the winner left to right.
-export function shuffleFrame(ids: string[], winner: string, elapsed: number, random: () => number = Math.random): string[] {
+// What the digit boxes show `elapsed` ms into the shuffle. `frame` counts the
+// frames drawn so far: each frame shows the next ID in `order` (wrapping round).
+// The whole ID changes in place; in the last SETTLE_MS the boxes lock onto the
+// winner left to right.
+export function shuffleFrame(
+  order: string[],
+  winner: string,
+  elapsed: number,
+  frame: number,
+  random: () => number = Math.random,
+): string[] {
   const n = winner.length;
   const settleStart = SHUFFLE_MS - SETTLE_MS;
   const settled =
     elapsed >= SHUFFLE_MS ? n : elapsed <= settleStart ? 0 : Math.min(n, Math.ceil(((elapsed - settleStart) / SETTLE_MS) * n));
-  const pick = ids.length ? ids[Math.floor(random() * ids.length)]! : "";
+  const pick = order.length ? order[frame % order.length]! : "";
   return Array.from({ length: n }, (_, i) => (i < settled ? winner[i]! : (pick[i] ?? DIGITS[Math.floor(random() * 10)]!)));
 }
 

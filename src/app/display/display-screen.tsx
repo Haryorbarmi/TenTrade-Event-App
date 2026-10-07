@@ -6,10 +6,9 @@ import { Logo } from "@/components/logo";
 import { ALIVE_MS, openDisplayChannel } from "@/lib/display-channel";
 import {
   SHUFFLE_MS,
-  SHUFFLE_TICK_MS,
-  expandPool,
   practiceRound,
   shuffleFrame,
+  shuffleOrder,
   type DisplayState,
 } from "@/lib/display";
 
@@ -200,26 +199,26 @@ function Countdown({ label, seconds }: { label: string; seconds: number }) {
 // Figma: Display · 3 Shuffling (3953:171). One Client ID in digit boxes; the
 // whole ID changes in place (nothing scrolls), then settles on the winner.
 function Shuffling({ state, onDone }: { state: Extract<DisplayState, { kind: "shuffling" }>; onDone: () => void }) {
-  const ids = useMemo(() => expandPool(state.pool), [state.pool]);
+  const order = useMemo(() => shuffleOrder(state.pool), [state.pool]);
   const winner = state.winner.clientId;
-  const [chars, setChars] = useState(() => shuffleFrame(ids, winner, 0));
+  const [chars, setChars] = useState(() => shuffleFrame(order, winner, 0, 0));
   const done = useRef(onDone);
   useEffect(() => {
     done.current = onDone;
   });
 
   useEffect(() => {
+    // One new Client ID per screen refresh, in order, so every ID in the pool is shown.
     const start = performance.now();
-    const timer = setInterval(() => {
+    let frameNo = 0;
+    let raf = requestAnimationFrame(function tick() {
       const elapsed = performance.now() - start;
-      setChars(shuffleFrame(ids, winner, elapsed));
-      if (elapsed >= SHUFFLE_MS + 500) {
-        clearInterval(timer);
-        done.current();
-      }
-    }, SHUFFLE_TICK_MS);
-    return () => clearInterval(timer);
-  }, [ids, winner]);
+      setChars(shuffleFrame(order, winner, elapsed, frameNo++));
+      if (elapsed >= SHUFFLE_MS + 500) done.current();
+      else raf = requestAnimationFrame(tick);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [order, winner]);
 
   // Long IDs shrink so every box still fits the 1280px frame.
   const n = chars.length;
