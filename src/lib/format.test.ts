@@ -1,12 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatLagosTime, formatPhone, shortName } from "./format";
-
-describe("formatPhone", () => {
-  it("spaces out stored Nigerian numbers", () => {
-    expect(formatPhone("+2348031234567")).toBe("+234 803 123 4567");
-    expect(formatPhone("something else")).toBe("something else");
-  });
-});
+import { formatLagosTime, shortName } from "./format";
 
 describe("formatLagosTime", () => {
   it("shows Lagos time (UTC+1) regardless of the device timezone", () => {

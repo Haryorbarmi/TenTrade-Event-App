@@ -21,7 +21,7 @@ function cellText(v: ExcelJS.CellValue): string {
   if (v instanceof Date) return v.toISOString();
   if (typeof v === "object") {
     if ("richText" in v) return v.richText.map((t) => t.text).join("");
-    if ("text" in v) return String(v.text); // hyperlink cell, e.g. an email
+    if ("text" in v) return String(v.text); // hyperlink cell
     if ("result" in v) return String(v.result ?? ""); // formula cell
     return "";
   }

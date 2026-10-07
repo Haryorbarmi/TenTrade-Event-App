@@ -14,8 +14,9 @@ export type RecentRow = {
 export const RECENT_LIMIT = 10;
 export const RECENT_COLUMNS = "id, seq, client_id, name, eligible, tickets, registered_by, created_at";
 
-export type AttendeeRow = RecentRow & { email: string; phone: string };
-export const ATTENDEE_COLUMNS = `${RECENT_COLUMNS}, email, phone`;
+// Only the Client ID and name are recorded about a person: no email or phone.
+export type AttendeeRow = RecentRow;
+export const ATTENDEE_COLUMNS = RECENT_COLUMNS;
 
 export type AttendeeFilter = {
   query: string;
@@ -23,14 +24,14 @@ export type AttendeeFilter = {
   registeredBy: string | null; // profile id, or null for everyone
 };
 
-// Search by name, email or Client ID (CLAUDE.md section 5), case-insensitive.
+// Search by name or Client ID (CLAUDE.md section 5), case-insensitive.
 export function filterAttendees<T extends AttendeeRow>(rows: T[], filter: AttendeeFilter): T[] {
   const q = filter.query.trim().toLowerCase();
   return rows.filter(
     (r) =>
       (!filter.eligibleOnly || r.eligible) &&
       (!filter.registeredBy || r.registered_by === filter.registeredBy) &&
-      (!q || r.name.toLowerCase().includes(q) || r.email.toLowerCase().includes(q) || r.client_id.toLowerCase().includes(q)),
+      (!q || r.name.toLowerCase().includes(q) || r.client_id.toLowerCase().includes(q)),
   );
 }
 

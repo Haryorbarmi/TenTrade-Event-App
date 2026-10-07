@@ -79,7 +79,7 @@ export function AttendeeForm() {
       </div>
 
       <p className="w-full rounded-[8px] bg-surface px-[14px] py-[12px] text-[12px] font-light leading-[normal] text-muted">
-        Privacy: we keep only the Client ID, name, email and phone, for this event&apos;s giveaways. Let the client know before you add them.
+        Privacy: we keep only the Client ID and name, for this event&apos;s giveaways. Let the client know before you add them.
       </p>
     </form>
   );

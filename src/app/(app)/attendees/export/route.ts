@@ -1,7 +1,6 @@
 import ExcelJS from "exceljs";
 import { getCurrentProfile } from "@/lib/auth";
 import { ATTENDEE_COLUMNS, summarize, type AttendeeRow } from "@/lib/attendees";
-import { formatPhone } from "@/lib/format";
 import { canExportAttendees } from "@/lib/roles";
 import { logActivity } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -44,8 +43,6 @@ export async function GET() {
     { header: "No.", key: "seq", width: 7 },
     { header: "Client ID", key: "client_id", width: 14 },
     { header: "Name", key: "name", width: 28 },
-    { header: "Email", key: "email", width: 32 },
-    { header: "Phone", key: "phone", width: 18 },
     { header: "Grand Draw", key: "eligible", width: 13 },
     { header: "Tickets", key: "tickets", width: 9 },
     { header: "Registered by", key: "registered_by", width: 20 },
@@ -53,7 +50,7 @@ export async function GET() {
     { header: "Time (WAT)", key: "time", width: 11 },
   ];
   sheet.getRow(1).font = { bold: true };
-  sheet.autoFilter = { from: "A1", to: "J1" };
+  sheet.autoFilter = { from: "A1", to: "H1" };
 
   for (const r of attendees) {
     const at = new Date(r.created_at);
@@ -61,8 +58,6 @@ export async function GET() {
       seq: r.seq,
       client_id: r.client_id,
       name: r.name,
-      email: r.email,
-      phone: formatPhone(r.phone),
       eligible: r.eligible ? "Eligible" : "Not eligible",
       tickets: r.tickets,
       registered_by: names[r.registered_by] ?? "",

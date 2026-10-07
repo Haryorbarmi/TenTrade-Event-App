@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { EligibilityPill, TicketsPill } from "@/components/attendee-pills";
 import { LiveIndicator } from "@/components/live-indicator";
 import { ATTENDEE_COLUMNS, filterAttendees, summarize, type AttendeeRow } from "@/lib/attendees";
-import { formatLagosTime, formatPhone, shortName } from "@/lib/format";
+import { formatLagosTime, shortName } from "@/lib/format";
 import { canEditAttendee, isSuperAdmin, type Profile } from "@/lib/roles";
 import { useAttendeesLive } from "@/lib/use-attendees-live";
 import { EditAttendeeDialog } from "./edit-attendee-dialog";
@@ -14,9 +14,7 @@ type Registrar = { id: string; name: string };
 const COLUMNS = [
   { label: "No.", width: "w-[48px]" },
   { label: "Client ID", width: "w-[90px]" },
-  { label: "Name", width: "w-[150px]" },
-  { label: "Email", width: "w-[200px]" },
-  { label: "Phone", width: "w-[150px]" },
+  { label: "Name", width: "w-[220px]" },
   { label: "Grand Draw", width: "w-[120px]" },
   { label: "Tickets", width: "w-[100px]" },
   { label: "Registered by", width: "w-[120px]" },
@@ -76,7 +74,7 @@ export function AttendeeTable({
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by name, email or Client ID"
+          placeholder="Search by name or Client ID"
           aria-label="Search attendees"
           className="h-[44px] w-full rounded-[8px] border border-line bg-white px-[16px] text-[14px] font-light text-ink outline-none placeholder:text-[rgba(115,115,115,0.9)] focus:border-accent sm:w-[380px]"
         />
@@ -132,7 +130,7 @@ export function AttendeeTable({
 
       <div className="w-full overflow-hidden rounded-[12px] border border-line bg-white">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1080px] table-fixed border-collapse text-left">
+          <table className="w-full min-w-[760px] table-fixed border-collapse text-left">
             <thead className="bg-surface">
               <tr>
                 {COLUMNS.map((c, i) => (
@@ -156,10 +154,6 @@ export function AttendeeTable({
                   <td className="truncate pr-2 font-normal" title={r.name}>
                     {r.name}
                   </td>
-                  <td className="truncate pr-2 font-light" title={r.email}>
-                    {r.email}
-                  </td>
-                  <td className="whitespace-nowrap pr-2 font-light">{formatPhone(r.phone)}</td>
                   <td>
                     <EligibilityPill eligible={r.eligible} />
                   </td>
@@ -169,7 +163,7 @@ export function AttendeeTable({
                   <td className="truncate pr-2 font-light">{shortName(nameOf[r.registered_by] ?? "…")}</td>
                   <td className="whitespace-nowrap pr-2 font-light">{formatLagosTime(r.created_at)}</td>
                   <td className="pr-[24px] text-right">
-                    {canEditAttendee(viewer, r) && (
+                    {canEditAttendee(viewer) && (
                       <button
                         type="button"
                         onClick={() => setEditing(r)}

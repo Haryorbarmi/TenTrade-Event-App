@@ -4,15 +4,13 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { AttendeeFields, hintClass, type AttendeeValues } from "@/components/attendee-fields";
 import type { AttendeeRow } from "@/lib/attendees";
 import type { FieldErrors } from "@/lib/attendee-validation";
-import { formatLagosTime, formatPhone, shortName } from "@/lib/format";
+import { formatLagosTime, shortName } from "@/lib/format";
 import { checkClientId } from "../registration/actions";
 import { getAttendeeHistory, updateAttendee, type AttendeeChange, type EditAttendeeState } from "./actions";
 
 const FIELD_LABELS: Record<string, string> = {
   client_id: "Client ID",
   name: "Name",
-  email: "Email",
-  phone: "Phone",
   eligible: "Grand Draw",
   tickets: "Tickets",
   source: "Source",
@@ -21,9 +19,11 @@ const FIELD_LABELS: Record<string, string> = {
 function showValue(field: string, value: string | null) {
   if (value === null || value === "") return "—";
   if (field === "eligible") return value === "true" ? "Eligible" : "Not eligible";
-  if (field === "phone") return formatPhone(value);
   return value;
 }
+
+// Email and phone are no longer collected; old edits to them stay out of sight.
+const HIDDEN_FIELDS = new Set(["email", "phone"]);
 
 type Props = {
   attendee: AttendeeRow;
@@ -39,8 +39,6 @@ export function EditAttendeeDialog({ attendee, names, canSeeHistory, onClose }: 
   const [values, setValues] = useState<AttendeeValues>({
     clientId: attendee.client_id,
     name: attendee.name,
-    email: attendee.email,
-    phone: formatPhone(attendee.phone),
     eligible: attendee.eligible,
     tickets: attendee.tickets,
   });
@@ -56,7 +54,7 @@ export function EditAttendeeDialog({ attendee, names, canSeeHistory, onClose }: 
     if (!canSeeHistory) return;
     let cancelled = false;
     getAttendeeHistory(attendee.id).then((rows) => {
-      if (!cancelled) setHistory(rows);
+      if (!cancelled) setHistory(rows && rows.filter((h) => !HIDDEN_FIELDS.has(h.field)));
     });
     return () => {
       cancelled = true;

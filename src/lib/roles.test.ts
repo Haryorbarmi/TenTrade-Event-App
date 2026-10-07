@@ -30,13 +30,11 @@ describe("role rules", () => {
     expect(canUseApp(null)).toBe(false);
   });
 
-  it("Super Admin edits any entry; registrars only their own", () => {
-    const ownEntry = { registered_by: "r" };
-    const otherEntry = { registered_by: "someone-else" };
-    expect(canEditAttendee(admin, otherEntry)).toBe(true);
-    expect(canEditAttendee(registrar, ownEntry)).toBe(true);
-    expect(canEditAttendee(registrar, otherEntry)).toBe(false);
-    expect(canEditAttendee(disabledRegistrar, ownEntry)).toBe(false);
-    expect(canEditAttendee(null, ownEntry)).toBe(false);
+  it("only active Super Admins can edit attendee entries", () => {
+    expect(canEditAttendee(admin)).toBe(true);
+    expect(canEditAttendee(registrar)).toBe(false);
+    expect(canEditAttendee(disabledAdmin)).toBe(false);
+    expect(canEditAttendee(disabledRegistrar)).toBe(false);
+    expect(canEditAttendee(null)).toBe(false);
   });
 });

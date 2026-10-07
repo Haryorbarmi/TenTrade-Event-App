@@ -11,8 +11,6 @@ export type ClientLookup =
   | {
       found: true;
       name: string;
-      email: string;
-      phone: string;
       eligible?: boolean;
       tickets?: number;
     };

@@ -24,17 +24,15 @@ export type AttendeeChange = {
   changed_at: string;
 };
 
-const NOT_ALLOWED = "You can only edit entries you registered. Ask a Super Admin to change this one.";
+const NOT_ALLOWED = "Only Super Admins can edit an entry. Ask a Super Admin to change this one.";
 
 // Seq, who registered and when never change: the database trigger locks them
-// and writes one audit row per changed field.
+// and writes one audit row per changed field. Super Admin only; the database
+// refuses registrars too.
 export async function updateAttendee(id: string, _prev: EditAttendeeState, formData: FormData): Promise<EditAttendeeState> {
   const profile = await requireUser();
+  if (!canEditAttendee(profile)) return { status: "error", errors: {}, message: NOT_ALLOWED };
   const supabase = await createClient();
-
-  const { data: current } = await supabase.from("attendees").select("registered_by").eq("id", id).maybeSingle();
-  if (!current) return { status: "error", errors: {}, message: "This entry no longer exists." };
-  if (!canEditAttendee(profile, current)) return { status: "error", errors: {}, message: NOT_ALLOWED };
 
   const result = validateAttendee(attendeeFromForm(formData));
   if ("errors" in result) return { status: "error", errors: result.errors };
@@ -46,8 +44,8 @@ export async function updateAttendee(id: string, _prev: EditAttendeeState, formD
     }
     return { status: "error", errors: {}, message: "Could not save. Check the connection and try again." };
   }
-  // RLS returns no rows when the user may not edit this entry.
-  if (!data?.length) return { status: "error", errors: {}, message: NOT_ALLOWED };
+  // No row back: the entry was deleted (e.g. an Event data wipe) while the pop-up was open.
+  if (!data?.length) return { status: "error", errors: {}, message: "This entry no longer exists." };
   return { status: "saved" };
 }
 

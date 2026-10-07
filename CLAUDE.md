@@ -59,7 +59,7 @@ About four users in total. Accounts are created by a Super Admin. **There is no 
 |---|---|---|
 | Login | Yes | Yes |
 | Registration (add attendees) | Yes | Yes |
-| Attendee list | Yes, with edit and export | Yes, view and add. No export |
+| Attendee list | Yes, with edit and export | Yes, view and add. No edit, no export |
 | Dashboard | Yes | Yes |
 | Raffle (all draws, lock, projector) | Yes | **Not allowed** |
 | Create, disable users, reset passwords | Yes | No |
@@ -82,10 +82,8 @@ Fields, in this order:
 
 1. **Client ID**: required, unique. Hint: "Type it exactly as shown on the portal."
 2. **Name**: required
-3. **Email**: required, format check
-4. **Phone number**: required, format check (Nigerian numbers, `+234` accepted)
-5. **Grand Draw eligibility**: toggle, **Eligible** or **Not eligible**
-6. **Tickets**: buttons 1 to 10. Selectable only when Eligible. Switching to Not eligible clears tickets to 0. Show "N tickets · N× the chance" under the buttons.
+3. **Grand Draw eligibility**: toggle, **Eligible** or **Not eligible**
+4. **Tickets**: buttons 1 to 10. Selectable only when Eligible. Switching to Not eligible clears tickets to 0. Show "N tickets · N× the chance" under the buttons.
 
 Buttons: **Add attendee**, **Clear**. A **Recent check-ins** panel shows the latest entries in arrival order.
 
@@ -98,14 +96,14 @@ Rules:
 - The ticket rule for the registrar's reference: 1 ticket per $100 in the account, up to 10 tickets at $1,000 or more. Round down to the nearest $100. **Confirm** this rounding.
 
 ### Attendee list
-Columns: **No., Client ID, Name, Email, Phone, Grand Draw (Eligible / Not eligible), Tickets, Registered by, Time**.
+Columns: **No., Client ID, Name, Grand Draw (Eligible / Not eligible), Tickets, Registered by, Time**.
 
-- Search by name, email or Client ID
+- Search by name or Client ID
 - Filters: All, Eligible only, Registered by (a person)
 - Live updates: a new entry from another registrar appears without a refresh
 - Footer: "Showing X of Y attendees · N eligible · T tickets in the Grand Draw"
 - **Export to Excel**: Super Admin only
-- Editing eligibility, tickets or details: Super Admin on any entry. Registrars on entries they created. **Confirm.** Every edit is logged with who, when, old value and new value.
+- Editing eligibility, tickets or details: **Super Admin only** (decided 2026-10-07; registrars can add but not edit, enforced by Row Level Security). Every edit is logged with who, when, old value and new value.
 
 ### Dashboard
 Cards: Checked in (with an optional "of N expected" setting the Super Admin can set), Grand Draw eligible (and total tickets in play), Peak arrivals (busiest 10-minute slot), Draws completed (for example 1 / 5).
@@ -123,7 +121,7 @@ Lock icon, "Not allowed", "Only Super Admins can open the Raffle. You can keep a
 Keep it minimal. **There is no balance column.**
 
 - `profiles`: `id` (auth user), `name`, `role` (`super_admin` | `registrar`), `active`
-- `attendees`: `id`, `seq` (unique, database-assigned arrival number), `client_id` (unique), `name`, `email`, `phone`, `eligible` (bool), `tickets` (int, 0 to 10, must be 0 when not eligible), `source` (`manual` for now, `crm` later), `registered_by` (profile), `created_at`, `updated_at`, `updated_by`
+- `attendees`: `id`, `seq` (unique, database-assigned arrival number), `client_id` (unique), `name`, `email` and `phone` (no longer collected; optional, left empty), `eligible` (bool), `tickets` (int, 0 to 10, must be 0 when not eligible), `source` (`manual` for now, `crm` later), `registered_by` (profile), `created_at`, `updated_at`, `updated_by`
 - `attendee_changes`: audit log of edits (`attendee_id`, `changed_by`, `changed_at`, `field`, `old_value`, `new_value`)
 - `participants`: Event Engagement tags (`attendee_id`, `tagged_by`, `tagged_at`)
 - `draws`: `id`, `type` (`grand` | `early_bird` | `lucky` | `engagement` | `knowledge`), `name`, `prize_amount`, `winners_count`, `status` (`open` | `locked` | `done`), `locked_by`, `locked_at`, `pool_snapshot` (jsonb of attendee ids and tickets at lock time)
@@ -181,7 +179,7 @@ Behaviour:
 
 ## 9. Privacy and security
 
-- Collect only: Client ID, name, email, phone, eligibility, tickets. Nothing else.
+- Collect only: Client ID, name, eligibility, tickets. Nothing else. (No email or phone, per the boss, 2026-10-07.)
 - No balances, ever (not in the UI, database, logs, exports or screenshots).
 - Comply with the Nigeria Data Protection Act: show a short consent note at the desk, and provide a way for the Super Admin to **delete all event data after the event**.
 - Use HTTPS only. Secrets only on the server.
@@ -223,7 +221,7 @@ Work one phase at a time. Finish and check each phase before the next. Read the 
 ## 13. Open items to confirm with the owner
 
 1. Ticket rounding: round down to the nearest $100. **Confirmed by owner 2026-10-06** ($99 = not eligible, $250 = 2, $1,000+ = 10).
-2. Whether registrars may edit their own entries. **Confirmed by owner 2026-10-06:** yes, own entries only, with the audit log.
+2. Whether registrars may edit their own entries. Confirmed 2026-10-06 (own entries only), **reversed 2026-10-07 on the boss's instruction: only Super Admins may edit**, with the audit log.
 3. Whether the Super Admin can edit the countdown length. **Confirmed by owner 2026-10-06:** yes, editable before each draw, default 10 seconds.
 4. Early Bird means the first 50 clients registered at the venue, in arrival order. **Confirmed by owner 2026-10-06:** arrival numbers 1 to 50, regardless of Grand Draw eligibility.
 5. Draw order for the five prizes. **Confirmed by owner 2026-10-06:** no fixed order; the programme decides on the day, and any draw can run first or last. The app must allow any order and must always remove every previous winner from every later draw's pool.
@@ -231,3 +229,5 @@ Work one phase at a time. Finish and check each phase before the next. Read the 
 7. Redraw and absent winners. **Confirmed by owner 2026-10-06:** draws are only for people physically present. A winner replaced because they are **absent** is excluded from every later draw. (Assumed, not yet confirmed: a winner replaced for another reason, e.g. not eligible, stays in later pools.)
 8. Projector connection. **Decided by owner 2026-10-06:** one laptop only. The display opens in a new tab of the same browser and is moved to the projector as an extended screen. Use the browser `BroadcastChannel` only; the Supabase Realtime channel and pairing code in section 8 are not needed.
 9. Client ID format. **Confirmed by owner 2026-10-06:** always exactly 6 digits; registration and edits require it.
+10. Email and phone. **Decided 2026-10-07 on the boss's instruction:** not collected or shown anywhere (form, list, edit, export, import). Only Client ID and name identify a person. Migration 0006 made the two columns optional; values saved before that stay in the database, hidden.
+11. Owner account. **Decided 2026-10-07:** Ayobami's account has `profiles.is_owner = true` (migration 0005, set only in the Supabase SQL editor). Other Super Admins cannot disable, demote or reset the password of the Owner.

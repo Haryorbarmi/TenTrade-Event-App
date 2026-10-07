@@ -9,13 +9,11 @@ import type { FieldErrors } from "@/lib/attendee-validation";
 export type AttendeeValues = {
   clientId: string;
   name: string;
-  email: string;
-  phone: string;
   eligible: boolean | null;
   tickets: number;
 };
 
-export const EMPTY_VALUES: AttendeeValues = { clientId: "", name: "", email: "", phone: "", eligible: null, tickets: 0 };
+export const EMPTY_VALUES: AttendeeValues = { clientId: "", name: "", eligible: null, tickets: 0 };
 
 const TICKET_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
@@ -41,24 +39,6 @@ export function AttendeeFields({ values, onChange, errors, clientIdWarning, onCl
   const set = (patch: Partial<AttendeeValues>) => onChange({ ...values, ...patch });
   const clientIdError = clientIdWarning ?? errors.clientId;
 
-  const text = (key: "name" | "email" | "phone", title: string, placeholder: string, type = "text") => (
-    <label className="flex w-full flex-col gap-[8px]">
-      <span className={label}>{title}</span>
-      <input
-        name={key}
-        type={type}
-        inputMode={type === "email" ? "email" : type === "tel" ? "tel" : undefined}
-        value={values[key]}
-        onChange={(e) => set({ [key]: e.target.value })}
-        placeholder={placeholder}
-        autoComplete="off"
-        aria-invalid={!!errors[key]}
-        className={inputClass(!!errors[key])}
-      />
-      {errors[key] && <span className={errorClass}>{errors[key]}</span>}
-    </label>
-  );
-
   return (
     <>
       <label className="flex w-full flex-col gap-[8px]">
@@ -83,9 +63,19 @@ export function AttendeeFields({ values, onChange, errors, clientIdWarning, onCl
         )}
       </label>
 
-      {text("name", "Name", "Full name")}
-      {text("email", "Email", "name@example.com", "email")}
-      {text("phone", "Phone number", "+234 800 000 0000", "tel")}
+      <label className="flex w-full flex-col gap-[8px]">
+        <span className={label}>Name</span>
+        <input
+          name="name"
+          value={values.name}
+          onChange={(e) => set({ name: e.target.value })}
+          placeholder="Full name"
+          autoComplete="off"
+          aria-invalid={!!errors.name}
+          className={inputClass(!!errors.name)}
+        />
+        {errors.name && <span className={errorClass}>{errors.name}</span>}
+      </label>
 
       <fieldset className="flex w-full flex-col gap-[8px]">
         <legend className={`${label} mb-[8px]`}>Grand Draw eligibility</legend>

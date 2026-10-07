@@ -6,8 +6,6 @@ const row = (seq: number, over: Partial<AttendeeRow>): AttendeeRow => ({
   seq,
   client_id: `C${seq}`,
   name: `Person ${seq}`,
-  email: `p${seq}@example.com`,
-  phone: "+2348031234567",
   eligible: false,
   tickets: 0,
   registered_by: "eniola",
@@ -18,7 +16,7 @@ const row = (seq: number, over: Partial<AttendeeRow>): AttendeeRow => ({
 const rows = [
   row(1, { name: "Ada Obi", eligible: true, tickets: 3 }),
   row(2, { name: "Tunde Bakare", client_id: "10517", registered_by: "chioma" }),
-  row(3, { name: "Ngozi Eze", email: "NGOZI@Mail.com", eligible: true, tickets: 10, registered_by: "chioma" }),
+  row(3, { name: "Ngozi Eze", eligible: true, tickets: 10, registered_by: "chioma" }),
 ];
 const all = { query: "", eligibleOnly: false, registeredBy: null };
 
@@ -27,9 +25,9 @@ describe("filterAttendees", () => {
     expect(filterAttendees(rows, all)).toHaveLength(3);
   });
 
-  it("searches name, email and Client ID, ignoring case and spaces", () => {
+  it("searches name and Client ID, ignoring case and spaces", () => {
     expect(filterAttendees(rows, { ...all, query: " ada " }).map((r) => r.seq)).toEqual([1]);
-    expect(filterAttendees(rows, { ...all, query: "ngozi@mail" }).map((r) => r.seq)).toEqual([3]);
+    expect(filterAttendees(rows, { ...all, query: "NGOZI" }).map((r) => r.seq)).toEqual([3]);
     expect(filterAttendees(rows, { ...all, query: "1051" }).map((r) => r.seq)).toEqual([2]);
     expect(filterAttendees(rows, { ...all, query: "nobody" })).toEqual([]);
   });

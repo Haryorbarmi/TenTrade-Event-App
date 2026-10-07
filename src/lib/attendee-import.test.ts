@@ -25,21 +25,21 @@ describe("parseCsv", () => {
 
 describe("tableToRows", () => {
   it("names the missing columns", () => {
-    const r = tableToRows(parseCsv("Name,Email\nAda,a@b.co"));
-    expect(r).toEqual({ error: expect.stringMatching(/Missing columns: Client ID, Phone/) });
+    const r = tableToRows(parseCsv("Email,Phone\na@b.co,0803"));
+    expect(r).toEqual({ error: expect.stringMatching(/Missing columns: Client ID, Name/) });
   });
   it("reports an empty file", () => {
     expect(tableToRows([])).toEqual({ error: "The file is empty." });
   });
 });
 
-const HEAD = "No.,Client ID,Name,Email,Phone\n";
+const HEAD = "No.,Client ID,Name\n";
 
 describe("planImport", () => {
   it("fills missing Grand Draw / Tickets at random, always valid", () => {
     let s = 12345;
     const seq = () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648; // seeded, repeatable
-    const csv = HEAD + Array.from({ length: 40 }, (_, i) => `${i + 1},${100000 + i},Name ${i},n${i}@x.com,+23480312345${String(10 + i).padStart(2, "0")}`).join("\n");
+    const csv = HEAD + Array.from({ length: 40 }, (_, i) => `${i + 1},${100000 + i},Name ${i}`).join("\n");
     const plan = planImport(rowsOf(csv), new Set(), seq);
     expect(plan.skipped).toEqual([]);
     expect(plan.rows).toHaveLength(40);
@@ -51,19 +51,25 @@ describe("planImport", () => {
   });
 
   it("uses Grand Draw and Tickets columns when the file has them", () => {
-    const csv = "Client ID,Name,Email,Phone,Grand Draw,Tickets\n111111,Ada,a@b.co,08031234567,Eligible,4\n222222,Bayo,b@b.co,08031234568,Not eligible,9";
+    const csv = "Client ID,Name,Grand Draw,Tickets\n111111,Ada,Eligible,4\n222222,Bayo,Not eligible,9";
     const plan = planImport(rowsOf(csv), new Set());
     expect(plan.rows.map((r) => [r.eligible, r.tickets])).toEqual([[true, 4], [false, 0]]);
+  });
+
+  it("ignores Email and Phone columns: only the Client ID and name are kept", () => {
+    const csv = "Client ID,Name,Email,Phone\n111111,Ada,a@b.co,08031234567";
+    const plan = planImport(rowsOf(csv), new Set());
+    expect(Object.keys(plan.rows[0]).sort()).toEqual(["client_id", "eligible", "name", "tickets"]);
   });
 
   it("skips invalid rows, existing Client IDs and repeats, with the line number", () => {
     const csv =
       HEAD +
-      "1,111111,Ada,a@b.co,08031234567\n" +
-      "2,12ab,Bad Id,b@b.co,08031234568\n" +
-      "3,222222,Bad Phone,c@b.co,12345\n" +
-      "4,333333,Taken,d@b.co,08031234569\n" +
-      "5,111111,Repeat,e@b.co,08031234560";
+      "1,111111,Ada\n" +
+      "2,12ab,Bad Id\n" +
+      "3,222222,\n" +
+      "4,333333,Taken\n" +
+      "5,111111,Repeat";
     const plan = planImport(rowsOf(csv), new Set(["333333"]));
     expect(plan.rows.map((r) => r.client_id)).toEqual(["111111"]);
     expect(plan.skipped.map((s) => s.line)).toEqual([3, 4, 5, 6]);
@@ -72,8 +78,8 @@ describe("planImport", () => {
   });
 
   it("restores leading zeros lost by spreadsheet numbers", () => {
-    const plan = planImport(rowsOf("Client ID,Name,Email,Phone\n1234,Ada,a@b.co,8031234567"), new Set());
-    expect(plan.rows[0]).toMatchObject({ client_id: "001234", phone: "+2348031234567" });
+    const plan = planImport(rowsOf("Client ID,Name\n1234,Ada"), new Set());
+    expect(plan.rows[0]).toMatchObject({ client_id: "001234" });
   });
 
   it("accepts the real sample file", () => {

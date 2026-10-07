@@ -35,8 +35,7 @@ export function canManageUsers(profile: Profile | null): boolean {
   return isSuperAdmin(profile);
 }
 
-// Super Admin edits any entry; registrars only entries they created.
-export function canEditAttendee(profile: Profile | null, attendee: { registered_by: string }): boolean {
-  if (!canUseApp(profile)) return false;
-  return isSuperAdmin(profile) || attendee.registered_by === profile!.id;
+// Only Super Admins edit attendee entries (registrars can add, not change).
+export function canEditAttendee(profile: Profile | null): boolean {
+  return isSuperAdmin(profile);
 }

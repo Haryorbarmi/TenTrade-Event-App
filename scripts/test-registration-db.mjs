@@ -52,13 +52,21 @@ try {
   const fake = await eniola.c.from("attendees").insert({ ...row(24), seq: 999, registered_by: chioma.id }).select("seq, registered_by").single();
   check("seq and registered_by cannot be faked", fake.data?.seq === 22 && fake.data?.registered_by === eniola.id, JSON.stringify(fake.data ?? fake.error?.message));
 
-  // 5. Edit rights + audit log.
-  const own = await eniola.c.from("attendees").update({ tickets: 5 }).eq("client_id", "TEST-1").select("tickets");
-  check("registrar can edit own entry", own.data?.length === 1 && own.data[0].tickets === 5);
+  // 5. Edit rights (Super Admin only) + audit log.
+  const own = await eniola.c.from("attendees").update({ tickets: 5 }).eq("client_id", "TEST-1").select();
+  check("registrar cannot edit even their own entry", (own.data?.length ?? 0) === 0);
   const other = await eniola.c.from("attendees").update({ tickets: 5 }).eq("client_id", "TEST-2").select();
   check("registrar cannot edit someone else's entry", (other.data?.length ?? 0) === 0);
-  const { data: audit } = await admin.from("attendee_changes").select("field, old_value, new_value, changed_by");
-  check("edit written to audit log", audit?.length === 1 && audit[0].field === "tickets" && audit[0].old_value === "1" && audit[0].new_value === "5" && audit[0].changed_by === eniola.id, JSON.stringify(audit));
+  const unchanged = await admin.from("attendees").select("tickets").in("client_id", ["TEST-1", "TEST-2"]);
+  check("blocked edits changed nothing", unchanged.data?.every((r) => r.tickets === 1) === true);
+  // The service role stands in for a Super Admin here; the audit trigger fires the same way.
+  await admin.from("attendees").update({ tickets: 5 }).eq("client_id", "TEST-1");
+  const { data: audit } = await admin.from("attendee_changes").select("field, old_value, new_value");
+  check("edit written to audit log", audit?.length === 1 && audit[0].field === "tickets" && audit[0].old_value === "1" && audit[0].new_value === "5", JSON.stringify(audit));
+
+  // 6. Email and phone are optional: a registrar can add someone with just a Client ID and name.
+  const slim = await eniola.c.from("attendees").insert({ client_id: "TEST-99", name: "No Contact", eligible: false, tickets: 0 }).select("email, phone").single();
+  check("entry without email or phone is accepted", !slim.error && slim.data?.email === null && slim.data?.phone === null, slim.error?.message ?? "");
 } finally {
   await admin.from("attendees").delete().like("client_id", "TEST-%");
   await admin.from("activity_log").delete().eq("action", "attendee_added");
