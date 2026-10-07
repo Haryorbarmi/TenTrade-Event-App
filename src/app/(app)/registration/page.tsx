@@ -1,4 +1,5 @@
 import { RECENT_COLUMNS, RECENT_LIMIT, type RecentRow } from "@/lib/attendees";
+import { crmMode } from "@/lib/crm/lookup-client";
 import { createClient } from "@/lib/supabase/server";
 import { AttendeeForm } from "./attendee-form";
 import { RecentCheckins } from "./recent-checkins";
@@ -22,7 +23,7 @@ export default async function RegistrationPage() {
       </header>
 
       <div className="flex w-full flex-col items-start gap-[32px] lg:flex-row">
-        <AttendeeForm />
+        <AttendeeForm crmEnabled={crmMode() !== "off"} />
         <RecentCheckins initialRows={(rows ?? []) as RecentRow[]} names={names} />
       </div>
     </div>

@@ -2,18 +2,41 @@
 
 import { useActionState, useRef, useState } from "react";
 import { AttendeeFields, EMPTY_VALUES, type AttendeeValues } from "@/components/attendee-fields";
-import type { FieldErrors } from "@/lib/attendee-validation";
-import { addAttendee, checkClientId, type AddAttendeeState } from "./actions";
+import { CLIENT_ID_RE, type FieldErrors } from "@/lib/attendee-validation";
+import { addAttendee, checkClientId, lookupClientAction, type AddAttendeeState } from "./actions";
 
 // Figma: Registration > Attendee form (3949:199)
-export function AttendeeForm() {
+// With the CRM lookup on, leaving the Client ID box fills in name, eligibility and
+// tickets. Everything stays editable, and with it off the form is fully manual.
+export function AttendeeForm({ crmEnabled }: { crmEnabled: boolean }) {
   const [values, setValues] = useState<AttendeeValues>(EMPTY_VALUES);
   const [duplicate, setDuplicate] = useState<string | null>(null);
+  const [lookupNote, setLookupNote] = useState<string | null>(null);
   const clientIdRef = useRef<HTMLInputElement>(null);
 
   function reset() {
     setValues(EMPTY_VALUES);
     setDuplicate(null);
+    setLookupNote(null);
+  }
+
+  async function onClientIdBlur(clientId: string) {
+    const dup = await checkClientId(clientId);
+    setDuplicate(dup);
+    if (dup || !crmEnabled || !CLIENT_ID_RE.test(clientId.trim())) return;
+
+    const found = await lookupClientAction(clientId);
+    if (found.found) {
+      // Ignore the answer if the registrar has already moved on to a different Client ID.
+      setValues((prev) =>
+        prev.clientId.trim() === clientId.trim() ? { ...prev, name: found.name, eligible: found.eligible, tickets: found.tickets } : prev,
+      );
+      setLookupNote("Found in the CRM: name and tickets filled in. Check them before adding.");
+    } else {
+      setLookupNote(
+        found.unavailable ? "The CRM is not responding. Enter the details by hand." : "Not found in the CRM. Enter the details by hand.",
+      );
+    }
   }
 
   const [state, formAction, pending] = useActionState(async (prev: AddAttendeeState, formData: FormData) => {
@@ -51,12 +74,16 @@ export function AttendeeForm() {
       <AttendeeFields
         values={values}
         onChange={(next) => {
-          if (next.clientId !== values.clientId) setDuplicate(null);
+          if (next.clientId !== values.clientId) {
+            setDuplicate(null);
+            setLookupNote(null);
+          }
           setValues(next);
         }}
         errors={errors}
         clientIdWarning={duplicate}
-        onClientIdBlur={async (clientId) => setDuplicate(await checkClientId(clientId))}
+        clientIdNote={lookupNote}
+        onClientIdBlur={onClientIdBlur}
         clientIdRef={clientIdRef}
         autoFocus
       />

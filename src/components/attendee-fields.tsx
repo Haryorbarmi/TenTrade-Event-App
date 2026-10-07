@@ -30,12 +30,13 @@ type Props = {
   onChange: (values: AttendeeValues) => void;
   errors: FieldErrors;
   clientIdWarning: string | null;
+  clientIdNote?: string | null; // e.g. the result of a CRM lookup, shown when there is no error
   onClientIdBlur: (clientId: string) => void;
   clientIdRef?: Ref<HTMLInputElement>;
   autoFocus?: boolean;
 };
 
-export function AttendeeFields({ values, onChange, errors, clientIdWarning, onClientIdBlur, clientIdRef, autoFocus }: Props) {
+export function AttendeeFields({ values, onChange, errors, clientIdWarning, clientIdNote, onClientIdBlur, clientIdRef, autoFocus }: Props) {
   const set = (patch: Partial<AttendeeValues>) => onChange({ ...values, ...patch });
   const clientIdError = clientIdWarning ?? errors.clientId;
 
@@ -58,6 +59,10 @@ export function AttendeeFields({ values, onChange, errors, clientIdWarning, onCl
         />
         {clientIdError ? (
           <span className={errorClass}>{clientIdError}</span>
+        ) : clientIdNote ? (
+          <span className={hintClass} role="status">
+            {clientIdNote}
+          </span>
         ) : (
           <span className={hintClass}>6 digits. Type it exactly as shown on the portal.</span>
         )}
