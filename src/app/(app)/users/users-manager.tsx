@@ -12,6 +12,7 @@ export type UserRow = {
   email: string;
   role: Role;
   active: boolean;
+  isOwner: boolean;
   lastSignIn: string | null;
 };
 
@@ -85,20 +86,27 @@ export function UsersManager({ users, myId }: { users: UserRow[]; myId: string }
               <tbody>
                 {users.map((u) => {
                   const me = u.id === myId;
+                  // Nobody but the Owner can change the Owner account (the server enforces this too).
+                  const locked = u.isOwner && !me;
                   return (
                     <tr key={u.id} className={`border-t border-line ${u.active ? "text-ink" : "text-muted"}`}>
                       <td className="py-[12px] pl-[24px]">
                         <span className="block">
                           {u.name}
                           {me && <span className="ml-[6px] text-[12px] text-muted">(you)</span>}
+                          {u.isOwner && (
+                            <span className="ml-[8px] inline-flex rounded-full bg-accent/10 px-[8px] py-[2px] text-[11px] font-semibold text-accent">
+                              Owner
+                            </span>
+                          )}
                         </span>
                         <span className="block text-[12px] font-light text-muted">{u.email}</span>
                       </td>
                       <td>
                         <select
                           value={u.role}
-                          disabled={pending || me}
-                          title={me ? "You cannot change your own role" : undefined}
+                          disabled={pending || me || locked}
+                          title={me ? "You cannot change your own role" : locked ? "Only the Owner can change this account" : undefined}
                           onChange={(e) => run(() => changeUser(u.id, { kind: "role", role: e.target.value as Role }))}
                           aria-label={`Role for ${u.name}`}
                           className="h-[34px] rounded-[6px] border border-line bg-white px-[8px] text-[13px] text-ink disabled:opacity-60"
@@ -118,22 +126,25 @@ export function UsersManager({ users, myId }: { users: UserRow[]; myId: string }
                       </td>
                       <td className="whitespace-nowrap font-light">{lastSeen(u.lastSignIn)}</td>
                       <td className="whitespace-nowrap pr-[24px] text-right">
-                        <button
-                          type="button"
-                          disabled={pending}
-                          onClick={() =>
-                            startTransition(async () => {
-                              setError(null);
-                              const r = await resetPassword(u.id);
-                              if (r.ok) setSecret({ name: u.name, email: u.email, password: r.value.password, created: false });
-                              else setError(r.error);
-                            })
-                          }
-                          className="rounded-[6px] px-[8px] py-[4px] text-[13px] text-accent hover:bg-accent/10 disabled:opacity-50"
-                        >
-                          Reset password
-                        </button>
-                        {!me && (
+                        {locked && <span className="px-[8px] text-[13px] font-light text-muted">Protected</span>}
+                        {!locked && (
+                          <button
+                            type="button"
+                            disabled={pending}
+                            onClick={() =>
+                              startTransition(async () => {
+                                setError(null);
+                                const r = await resetPassword(u.id);
+                                if (r.ok) setSecret({ name: u.name, email: u.email, password: r.value.password, created: false });
+                                else setError(r.error);
+                              })
+                            }
+                            className="rounded-[6px] px-[8px] py-[4px] text-[13px] text-accent hover:bg-accent/10 disabled:opacity-50"
+                          >
+                            Reset password
+                          </button>
+                        )}
+                        {!me && !locked && (
                           <button
                             type="button"
                             disabled={pending}

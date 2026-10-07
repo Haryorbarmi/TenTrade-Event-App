@@ -13,13 +13,22 @@ export function generatePassword(random: (max: number) => number = randomInt): s
   return [group(), group(), group()].join("-");
 }
 
-export type ManagedUser = { id: string; role: Role; active: boolean };
+// isOwner marks the one head account that no other Super Admin can touch.
+export type ManagedUser = { id: string; role: Role; active: boolean; isOwner?: boolean };
 
 export type UserChange = { kind: "disable" } | { kind: "enable" } | { kind: "role"; role: Role };
+
+const OWNER_PROTECTED = "This is the Owner account. Only the Owner can change it.";
+
+// Only the Owner can reset the Owner's password; otherwise another Super Admin could sign in as them.
+export function checkPasswordReset(actorId: string, target: ManagedUser): string | null {
+  return target.isOwner && target.id !== actorId ? OWNER_PROTECTED : null;
+}
 
 // Refuses changes that could lock everyone out. Returns an error message, or null if allowed.
 export function checkUserChange(actorId: string, target: ManagedUser, change: UserChange, everyone: ManagedUser[]): string | null {
   const self = target.id === actorId;
+  if (target.isOwner && !self) return OWNER_PROTECTED;
   if (change.kind === "enable") return null;
   if (change.kind === "role" && change.role === target.role) return null;
   if (change.kind === "role" && change.role === "super_admin") return null;

@@ -3,7 +3,7 @@
 import { requireSuperAdmin } from "@/lib/auth";
 import type { Role } from "@/lib/roles";
 import { createAdminClient, logActivity } from "@/lib/supabase/admin";
-import { checkUserChange, generatePassword, validateNewUser, type ManagedUser, type UserChange } from "@/lib/users";
+import { checkPasswordReset, checkUserChange, generatePassword, validateNewUser, type ManagedUser, type UserChange } from "@/lib/users";
 
 type Result<T = null> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -11,8 +11,8 @@ type Result<T = null> = { ok: true; value: T } | { ok: false; error: string };
 // to the Super Admin's screen and never logged.
 
 async function everyone(): Promise<ManagedUser[]> {
-  const { data } = await createAdminClient().from("profiles").select("id, role, active");
-  return (data ?? []) as ManagedUser[];
+  const { data } = await createAdminClient().from("profiles").select("id, role, active, is_owner");
+  return (data ?? []).map((p) => ({ id: p.id, role: p.role, active: p.active, isOwner: p.is_owner })) as ManagedUser[];
 }
 
 export async function createUser(input: { name: string; email: string; role: string }): Promise<Result<{ password: string }>> {
@@ -43,6 +43,11 @@ export async function createUser(input: { name: string; email: string; role: str
 
 export async function resetPassword(userId: string): Promise<Result<{ password: string }>> {
   const me = await requireSuperAdmin();
+  const target = (await everyone()).find((u) => u.id === userId);
+  if (!target) return { ok: false, error: "User not found." };
+  const refused = checkPasswordReset(me.id, target);
+  if (refused) return { ok: false, error: refused };
+
   const password = generatePassword();
   const { error } = await createAdminClient().auth.admin.updateUserById(userId, { password });
   if (error) return { ok: false, error: "Could not reset the password. Try again." };

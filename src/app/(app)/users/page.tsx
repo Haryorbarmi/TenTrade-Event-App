@@ -13,7 +13,7 @@ export default async function UsersPage() {
 
   const admin = createAdminClient();
   const [{ data: profiles }, { data: auth }] = await Promise.all([
-    admin.from("profiles").select("id, name, role, active, created_at").order("created_at"),
+    admin.from("profiles").select("id, name, role, active, is_owner, created_at").order("created_at"),
     admin.auth.admin.listUsers({ perPage: 200 }),
   ]);
   const authById = new Map((auth?.users ?? []).map((u) => [u.id, u]));
@@ -23,6 +23,7 @@ export default async function UsersPage() {
     name: p.name,
     role: p.role as Role,
     active: p.active,
+    isOwner: p.is_owner,
     email: authById.get(p.id)?.email ?? "",
     lastSignIn: authById.get(p.id)?.last_sign_in_at ?? null,
   }));

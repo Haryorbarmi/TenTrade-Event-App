@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkUserChange, generatePassword, validateNewUser, type ManagedUser } from "./users";
+import { checkPasswordReset, checkUserChange, generatePassword, validateNewUser, type ManagedUser } from "./users";
 
 describe("generatePassword", () => {
   it("makes three groups of five readable characters", () => {
@@ -30,6 +30,20 @@ describe("checkUserChange", () => {
     const meDisabled = { ...me, active: false };
     // Acting as a (theoretically) different admin on the last active one.
     expect(checkUserChange("someone", tolu, { kind: "disable" }, [meDisabled, tolu, desk])).toMatch(/last active Super Admin/);
+  });
+
+  it("protects the Owner from every other Super Admin", () => {
+    const owner: ManagedUser = { id: "owner", role: "super_admin", active: true, isOwner: true };
+    const all = [owner, me, tolu, desk];
+    expect(checkUserChange("me", owner, { kind: "disable" }, all)).toMatch(/Owner account/);
+    expect(checkUserChange("me", owner, { kind: "role", role: "registrar" }, all)).toMatch(/Owner account/);
+    expect(checkPasswordReset("me", owner)).toMatch(/Owner account/);
+    // The Owner can still reset their own password, and others' passwords.
+    expect(checkPasswordReset("owner", owner)).toBeNull();
+    expect(checkPasswordReset("owner", tolu)).toBeNull();
+    expect(checkUserChange("owner", tolu, { kind: "disable" }, all)).toBeNull();
+    // The existing self-protection still applies to the Owner.
+    expect(checkUserChange("owner", owner, { kind: "disable" }, all)).toMatch(/your own account/);
   });
 
   it("always allows enabling, promoting, and managing registrars", () => {
