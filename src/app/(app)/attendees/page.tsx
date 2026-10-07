@@ -3,6 +3,7 @@ import { ATTENDEE_COLUMNS, type AttendeeRow } from "@/lib/attendees";
 import { canExportAttendees } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { AttendeeTable } from "./attendee-table";
+import { ImportButton } from "./import-button";
 
 export const metadata = { title: "Attendees · TenTrade Lagos Seminar 2026" };
 
@@ -23,14 +24,18 @@ export default async function AttendeesPage() {
           <p className="text-[14px] font-light leading-[normal] text-muted">Everyone who has checked in, in arrival order.</p>
         </div>
         {canExportAttendees(viewer) && (
-          // Plain link: the browser downloads the file. The route re-checks the role.
-          <a
-            href="/attendees/export"
-            download
-            className="flex h-[44px] shrink-0 items-center justify-center rounded-[8px] border border-line bg-white px-[20px] text-[14px] text-ink hover:border-ink"
-          >
-            Export to Excel
-          </a>
+          <div className="flex shrink-0 items-center gap-[12px]">
+            {/* TESTING ONLY: remove the import button before the event. */}
+            <ImportButton />
+            {/* Plain link: the browser downloads the file. The route re-checks the role. */}
+            <a
+              href="/attendees/export"
+              download
+              className="flex h-[44px] shrink-0 items-center justify-center rounded-[8px] border border-line bg-white px-[20px] text-[14px] text-ink hover:border-ink"
+            >
+              Export to Excel
+            </a>
+          </div>
         )}
       </header>
 
