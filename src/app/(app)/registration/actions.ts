@@ -27,7 +27,7 @@ async function lookupSafely(clientId: string): Promise<ClientLookup> {
 }
 
 // Called when the registrar leaves the Client ID box. Returns name, eligible and tickets
-// only (never a balance). With the CRM switched off it finds nothing, and the form stays manual.
+// only (never a balance or net deposit). With the CRM switched off it finds nothing, and the form stays manual.
 export async function lookupClientAction(clientId: string): Promise<ClientLookup> {
   await requireUser();
   const id = clientId.trim();

@@ -92,8 +92,8 @@ Rules:
 - If the Client ID already exists, warn and block a second entry.
 - Each new entry gets the next arrival number (`seq`), assigned by the database, not by the browser, so two registrars cannot get the same number.
 - The registrar's name and the time are saved automatically.
-- **Account balances are never typed, shown or stored anywhere in this app.** The registrar reads the balance on the company portal and only sets Eligible and the ticket count.
-- The ticket rule for the registrar's reference: 1 ticket per $100 in the account, up to 10 tickets at $1,000 or more. Round down to the nearest $100. **Confirm** this rounding.
+- **Account balances and net deposits are never typed, shown or stored anywhere in this app.** The registrar reads the figure on the company portal and only sets Eligible and the ticket count.
+- The ticket rule for the registrar's reference: 1 ticket per $100 of **net deposit** (deposits minus withdrawals; decided by the boss 2026-10-09, replacing "balance"), up to 10 tickets at $1,000 or more. Round down to the nearest $100. A zero or negative net deposit is not eligible.
 
 ### Attendee list
 Columns: **No., Client ID, Name, Grand Draw (Eligible / Not eligible), Tickets, Registered by, Time**.
@@ -180,7 +180,7 @@ Behaviour:
 ## 9. Privacy and security
 
 - Collect only: Client ID, name, eligibility, tickets. Nothing else. (No email or phone, per the boss, 2026-10-07.)
-- No balances, ever (not in the UI, database, logs, exports or screenshots).
+- No balances or net deposits, ever (not in the UI, database, logs, exports or screenshots).
 - Comply with the Nigeria Data Protection Act: show a short consent note at the desk, and provide a way for the Super Admin to **delete all event data after the event**.
 - Use HTTPS only. Secrets only on the server.
 - Registrars cannot export the list.
@@ -197,7 +197,7 @@ Design for it now, build nothing real yet:
 - Today it returns "not found", and the registrar types everything in. Later an FXBO version fills the same fields and the registrar only confirms.
 - Eligibility and tickets stay separate fields so a future lookup can pre-set them without removing the registrar's ability to correct them.
 - The `source` column on `attendees` records `manual` or `crm`.
-- Any future FXBO credentials must live only on the server, read-only, with the minimum permissions. Never send a balance to the browser: if the CRM returns one, the server converts it to eligible and tickets and discards it.
+- Any future FXBO credentials must live only on the server, read-only, with the minimum permissions. Never send a balance or net deposit to the browser: if the CRM returns one, the server converts it to eligible and tickets and discards it.
 
 ## 11. Build phases
 
@@ -231,3 +231,4 @@ Work one phase at a time. Finish and check each phase before the next. Read the 
 9. Client ID format. **Confirmed by owner 2026-10-06:** always exactly 6 digits; registration and edits require it.
 10. Email and phone. **Decided 2026-10-07 on the boss's instruction:** not collected or shown anywhere (form, list, edit, export, import). Only Client ID and name identify a person. Migration 0006 made the two columns optional; values saved before that stay in the database, hidden.
 11. Owner account. **Decided 2026-10-07:** Ayobami's account has `profiles.is_owner = true` (migration 0005, set only in the Supabase SQL editor). Other Super Admins cannot disable, demote or reset the password of the Owner.
+12. Ticket measure for the CRM lookup. **Decided by the boss 2026-10-09:** net deposit (deposits minus withdrawals), not balance or equity; same thresholds (1 ticket per $100, max 10 at $1,000). **Still open before connecting the CRM:** over what period (since the account opened, or since a date), one account or all of a client's accounts, whether bonuses/credits/internal transfers count, the currency, and the snapshot time.

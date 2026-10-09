@@ -7,7 +7,7 @@ describe("fakeLookup", () => {
     expect(fakeLookup("123459")).toEqual({ found: false, unavailable: true });
   });
 
-  it("returns a name and a valid eligibility/ticket result, never a balance", () => {
+  it("returns a name and a valid eligibility/ticket result, never a financial figure", () => {
     for (let n = 100001; n < 100400; n++) {
       const r = fakeLookup(String(n));
       if (!r.found) continue;

@@ -10,8 +10,9 @@ import type { ClientLookup } from "./types";
 //
 // There is no "live" mode yet: FXBO has no public API docs and nothing is built
 // against a guessed endpoint. A real version would be added here and must turn
-// any balance into eligible + tickets with ticketsForBalance(), then discard it:
-// a balance must never reach the browser, the database, logs or exports.
+// the client's NET DEPOSIT (the boss's rule) into eligible + tickets with
+// ticketsForNetDeposit(), then discard it: no financial figure may reach the
+// browser, the database, logs or exports.
 
 export type { ClientLookup } from "./types";
 
