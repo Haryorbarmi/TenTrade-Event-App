@@ -10,6 +10,7 @@ import {
 import { canEditAttendee, isSuperAdmin } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient, logActivity } from "@/lib/supabase/admin";
+import { currentWins, tidyDrawsAfterDelete, type Win } from "@/lib/attendee-removal";
 
 export type EditAttendeeState =
   | { status: "idle" }
@@ -53,28 +54,47 @@ export async function updateAttendee(id: string, _prev: EditAttendeeState, formD
 export type DeleteAttendeeResult = { status: "deleted" } | { status: "error"; message: string };
 
 const DELETE_NOT_ALLOWED = "Only Super Admins can delete an entry.";
-const DELETE_WINNER = "This client has already won a prize and can't be deleted.";
 
-// Super Admin only (the database refuses registrars too). A client who has a
-// raffle win, current or replaced, is kept so the raffle record stays whole.
-// The activity log notes the arrival number only, never a name.
+// Prizes the client holds now, so the confirmation can say what deleting will reopen.
+export async function getAttendeePrizes(id: string): Promise<string[] | null> {
+  const profile = await getCurrentProfile();
+  if (!canEditAttendee(profile)) return null;
+  try {
+    return (await currentWins(createAdminClient(), id)).map((w) => w.drawName);
+  } catch {
+    return null;
+  }
+}
+
+// Super Admin only (the database refuses registrars too). If the client holds a
+// prize, it is reset: the slot is free to draw again from the same locked list
+// (see lib/attendee-removal.ts). The activity log notes the arrival number
+// and the prizes reopened, never a name.
 export async function deleteAttendee(id: string): Promise<DeleteAttendeeResult> {
   const profile = await requireUser();
   if (!canEditAttendee(profile)) return { status: "error", message: DELETE_NOT_ALLOWED };
 
-  const { count, error: winError } = await createAdminClient()
-    .from("winners")
-    .select("*", { count: "exact", head: true })
-    .eq("attendee_id", id);
-  if (winError) return { status: "error", message: "Could not check the raffle results. Try again." };
-  if (count) return { status: "error", message: DELETE_WINNER };
+  const admin = createAdminClient();
+  let wins: Win[];
+  try {
+    wins = await currentWins(admin, id);
+  } catch {
+    return { status: "error", message: "Could not check the raffle results. Try again." };
+  }
 
   const supabase = await createClient();
   const { data, error } = await supabase.from("attendees").delete().eq("id", id).select("seq");
   if (error) return { status: "error", message: "Could not delete. Check the connection and try again." };
   if (!data?.length) return { status: "error", message: "This entry no longer exists." };
 
-  await logActivity(profile.id, "attendee_deleted", { seq: data[0].seq });
+  try {
+    await tidyDrawsAfterDelete(admin, id, wins);
+  } catch {
+    await logActivity(profile.id, "attendee_deleted", { seq: data[0].seq, prizes_reopened: wins.map((w) => w.drawName), draws_tidied: false });
+    return { status: "error", message: "The entry was deleted, but the raffle lists could not be updated. Open the Raffle page and check the draws." };
+  }
+
+  await logActivity(profile.id, "attendee_deleted", { seq: data[0].seq, prizes_reopened: wins.map((w) => w.drawName) });
   return { status: "deleted" };
 }
 

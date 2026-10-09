@@ -6,7 +6,7 @@ import type { AttendeeRow } from "@/lib/attendees";
 import type { FieldErrors } from "@/lib/attendee-validation";
 import { formatLagosTime, shortName } from "@/lib/format";
 import { checkClientId } from "../registration/actions";
-import { deleteAttendee, getAttendeeHistory, updateAttendee, type AttendeeChange, type EditAttendeeState } from "./actions";
+import { deleteAttendee, getAttendeeHistory, getAttendeePrizes, updateAttendee, type AttendeeChange, type EditAttendeeState } from "./actions";
 
 const FIELD_LABELS: Record<string, string> = {
   client_id: "Client ID",
@@ -47,6 +47,13 @@ export function EditAttendeeDialog({ attendee, names, canSeeHistory, onClose }: 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const [prizes, setPrizes] = useState<string[]>([]);
+
+  async function askToDelete() {
+    setPrizes((await getAttendeePrizes(attendee.id)) ?? []);
+    setConfirmingDelete(true);
+  }
 
   async function confirmDelete() {
     setDeleting(true);
@@ -151,6 +158,12 @@ export function EditAttendeeDialog({ attendee, names, canSeeHistory, onClose }: 
                 Delete No. {attendee.seq}, Client ID <span className="font-semibold">{attendee.client_id}</span> ({attendee.name})? This
                 cannot be undone. The Client ID can be registered again afterwards.
               </p>
+              {prizes.length > 0 && (
+                <p className="rounded-[8px] bg-[#c81e1e]/10 px-[14px] py-[10px] text-[13px] leading-[normal]">
+                  This client won <span className="font-semibold">{prizes.join(", ")}</span>. Deleting them resets that prize, so it can be
+                  drawn again from the same locked list.
+                </p>
+              )}
               {deleteError && (
                 <p role="alert" className="rounded-[8px] bg-[#c81e1e]/10 px-[14px] py-[10px] text-[13px]">
                   {deleteError}
@@ -181,7 +194,7 @@ export function EditAttendeeDialog({ attendee, names, canSeeHistory, onClose }: 
           ) : (
             <button
               type="button"
-              onClick={() => setConfirmingDelete(true)}
+              onClick={askToDelete}
               className="flex h-[40px] items-center justify-center self-start rounded-[8px] border border-[#c81e1e] bg-white px-[20px] text-[14px] text-[#c81e1e]"
             >
               Delete entry
