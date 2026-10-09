@@ -6,7 +6,7 @@ import type { AttendeeRow } from "@/lib/attendees";
 import type { FieldErrors } from "@/lib/attendee-validation";
 import { formatLagosTime, shortName } from "@/lib/format";
 import { checkClientId } from "../registration/actions";
-import { getAttendeeHistory, updateAttendee, type AttendeeChange, type EditAttendeeState } from "./actions";
+import { deleteAttendee, getAttendeeHistory, updateAttendee, type AttendeeChange, type EditAttendeeState } from "./actions";
 
 const FIELD_LABELS: Record<string, string> = {
   client_id: "Client ID",
@@ -44,6 +44,18 @@ export function EditAttendeeDialog({ attendee, names, canSeeHistory, onClose }: 
   });
   const [duplicate, setDuplicate] = useState<string | null>(null);
   const [history, setHistory] = useState<AttendeeChange[] | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function confirmDelete() {
+    setDeleting(true);
+    setDeleteError(null);
+    const result = await deleteAttendee(attendee.id);
+    setDeleting(false);
+    if (result.status === "deleted") dialogRef.current?.close();
+    else setDeleteError(result.message);
+  }
 
   useEffect(() => {
     dialogRef.current?.showModal();
@@ -131,6 +143,51 @@ export function EditAttendeeDialog({ attendee, names, canSeeHistory, onClose }: 
             Cancel
           </button>
         </div>
+
+        <section className="flex w-full flex-col gap-[10px] border-t border-line pt-[20px]">
+          {confirmingDelete ? (
+            <>
+              <p className="text-[13px] leading-[normal]">
+                Delete No. {attendee.seq}, Client ID <span className="font-semibold">{attendee.client_id}</span> ({attendee.name})? This
+                cannot be undone. The Client ID can be registered again afterwards.
+              </p>
+              {deleteError && (
+                <p role="alert" className="rounded-[8px] bg-[#c81e1e]/10 px-[14px] py-[10px] text-[13px]">
+                  {deleteError}
+                </p>
+              )}
+              <div className="flex gap-[12px]">
+                <button
+                  type="button"
+                  onClick={confirmDelete}
+                  disabled={deleting}
+                  className="flex h-[40px] items-center justify-center rounded-[8px] bg-[#c81e1e] px-[20px] text-[14px] font-semibold text-white disabled:opacity-60"
+                >
+                  {deleting ? "Deleting…" : "Yes, delete"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmingDelete(false);
+                    setDeleteError(null);
+                  }}
+                  disabled={deleting}
+                  className="flex h-[40px] items-center justify-center rounded-[8px] border border-line bg-white px-[20px] text-[14px]"
+                >
+                  Keep entry
+                </button>
+              </div>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(true)}
+              className="flex h-[40px] items-center justify-center self-start rounded-[8px] border border-[#c81e1e] bg-white px-[20px] text-[14px] text-[#c81e1e]"
+            >
+              Delete entry
+            </button>
+          )}
+        </section>
 
         {canSeeHistory && (
           <section className="flex w-full flex-col gap-[10px] border-t border-line pt-[20px]">

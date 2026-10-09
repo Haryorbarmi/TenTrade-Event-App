@@ -9,6 +9,7 @@ import {
 } from "@/lib/attendee-validation";
 import { canEditAttendee, isSuperAdmin } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, logActivity } from "@/lib/supabase/admin";
 
 export type EditAttendeeState =
   | { status: "idle" }
@@ -47,6 +48,34 @@ export async function updateAttendee(id: string, _prev: EditAttendeeState, formD
   // No row back: the entry was deleted (e.g. an Event data wipe) while the pop-up was open.
   if (!data?.length) return { status: "error", errors: {}, message: "This entry no longer exists." };
   return { status: "saved" };
+}
+
+export type DeleteAttendeeResult = { status: "deleted" } | { status: "error"; message: string };
+
+const DELETE_NOT_ALLOWED = "Only Super Admins can delete an entry.";
+const DELETE_WINNER = "This client has already won a prize and can't be deleted.";
+
+// Super Admin only (the database refuses registrars too). A client who has a
+// raffle win, current or replaced, is kept so the raffle record stays whole.
+// The activity log notes the arrival number only, never a name.
+export async function deleteAttendee(id: string): Promise<DeleteAttendeeResult> {
+  const profile = await requireUser();
+  if (!canEditAttendee(profile)) return { status: "error", message: DELETE_NOT_ALLOWED };
+
+  const { count, error: winError } = await createAdminClient()
+    .from("winners")
+    .select("*", { count: "exact", head: true })
+    .eq("attendee_id", id);
+  if (winError) return { status: "error", message: "Could not check the raffle results. Try again." };
+  if (count) return { status: "error", message: DELETE_WINNER };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("attendees").delete().eq("id", id).select("seq");
+  if (error) return { status: "error", message: "Could not delete. Check the connection and try again." };
+  if (!data?.length) return { status: "error", message: "This entry no longer exists." };
+
+  await logActivity(profile.id, "attendee_deleted", { seq: data[0].seq });
+  return { status: "deleted" };
 }
 
 // Change history is visible to Super Admins only (RLS returns nothing to registrars).
