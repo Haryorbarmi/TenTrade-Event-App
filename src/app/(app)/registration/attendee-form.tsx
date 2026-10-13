@@ -29,12 +29,22 @@ export function AttendeeForm({ crmEnabled }: { crmEnabled: boolean }) {
     if (found.found) {
       // Ignore the answer if the registrar has already moved on to a different Client ID.
       setValues((prev) =>
-        prev.clientId.trim() === clientId.trim() ? { ...prev, name: found.name, eligible: found.eligible, tickets: found.tickets } : prev,
+        prev.clientId.trim() === clientId.trim() ? {
+              ...prev,
+              firstName: found.firstName,
+              middleName: found.middleName,
+              lastName: found.lastName,
+              eligible: found.eligible,
+              tickets: found.tickets,
+            }
+          : prev,
       );
-      setLookupNote("Found in the CRM: name and tickets filled in. Check them before adding.");
+      setLookupNote("Found in the client roster: name and tickets filled in. Check them before adding.");
     } else {
       setLookupNote(
-        found.unavailable ? "The CRM is not responding. Enter the details by hand." : "Not found in the CRM. Enter the details by hand.",
+        found.unavailable
+          ? "The client roster could not be read. Enter the details by hand."
+          : "Not found in the client roster. Enter the details by hand.",
       );
     }
   }

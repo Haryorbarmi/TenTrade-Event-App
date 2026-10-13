@@ -81,7 +81,7 @@ Email and password, a Sign in button, "Forgot your password? Ask the admin to re
 Fields, in this order:
 
 1. **Client ID**: required, unique. Hint: "Type it exactly as shown on the portal."
-2. **Name**: required
+2. **First name** (required), **Middle name** (optional), **Last name** (required). Filled in from the client roster when the Client ID is found; `attendees.name` is the three joined.
 3. **Grand Draw eligibility**: toggle, **Eligible** or **Not eligible**
 4. **Tickets**: buttons 1 to 10. Selectable only when Eligible. Switching to Not eligible clears tickets to 0. Show "N tickets · N× the chance" under the buttons.
 
@@ -92,8 +92,8 @@ Rules:
 - If the Client ID already exists, warn and block a second entry.
 - Each new entry gets the next arrival number (`seq`), assigned by the database, not by the browser, so two registrars cannot get the same number.
 - The registrar's name and the time are saved automatically.
-- **Account balances and net deposits are never typed, shown or stored anywhere in this app.** The registrar reads the figure on the company portal and only sets Eligible and the ticket count.
-- The ticket rule for the registrar's reference: 1 ticket per $100 of **net deposit** (deposits minus withdrawals; decided by the boss 2026-10-09, replacing "balance"), up to 10 tickets at $1,000 or more. Round down to the nearest $100. A zero or negative net deposit is not eligible.
+- **Account balances are never typed or shown in this app, and never stored on attendees.** They exist only in the server-only `client_roster` table (imported from the company's Excel sheet), where the server turns them into Eligible and the ticket count for the registrar. The Client roster page shows balances as asterisks.
+- The ticket rule: 1 ticket per $100 of **account balance** (changed back from net deposit on 2026-10-13), up to 10 tickets at $1,000 or more. Round down to the nearest $100. A zero or negative balance is not eligible.
 
 ### Attendee list
 Columns: **No., Client ID, Name, Grand Draw (Eligible / Not eligible), Tickets, Registered by, Time**.
@@ -118,10 +118,10 @@ Lock icon, "Not allowed", "Only Super Admins can open the Raffle. You can keep a
 
 ## 6. Data model (Supabase / Postgres)
 
-Keep it minimal. **There is no balance column.**
+Keep it minimal. **There is no balance column on `attendees`.** The only place a balance is stored is `client_roster` (`client_id` also called CRM ID, `first_name`, `middle_name`, `last_name`, `balance`, `imported_at`, `imported_by`): row security on with no policies, so only the server (service role) can read it. Super Admins import it on the Client roster page; a re-import replaces it.
 
 - `profiles`: `id` (auth user), `name`, `role` (`super_admin` | `registrar`), `active`
-- `attendees`: `id`, `seq` (unique, database-assigned arrival number), `client_id` (unique), `name`, `email` and `phone` (no longer collected; optional, left empty), `eligible` (bool), `tickets` (int, 0 to 10, must be 0 when not eligible), `source` (`manual` for now, `crm` later), `registered_by` (profile), `created_at`, `updated_at`, `updated_by`
+- `attendees`: `id`, `seq` (unique, database-assigned arrival number), `client_id` (unique), `name` (first, middle and last joined), `first_name`, `middle_name`, `last_name`, `email` and `phone` (no longer collected; optional, left empty), `eligible` (bool), `tickets` (int, 0 to 10, must be 0 when not eligible), `source` (`manual` for now, `crm` later), `registered_by` (profile), `created_at`, `updated_at`, `updated_by`
 - `attendee_changes`: audit log of edits (`attendee_id`, `changed_by`, `changed_at`, `field`, `old_value`, `new_value`)
 - `participants`: Event Engagement tags (`attendee_id`, `tagged_by`, `tagged_at`)
 - `draws`: `id`, `type` (`grand` | `early_bird` | `lucky` | `engagement` | `knowledge`), `name`, `prize_amount`, `winners_count`, `status` (`open` | `locked` | `done`), `locked_by`, `locked_at`, `pool_snapshot` (jsonb of attendee ids and tickets at lock time)
@@ -180,14 +180,16 @@ Behaviour:
 ## 9. Privacy and security
 
 - Collect only: Client ID, name, eligibility, tickets. Nothing else. (No email or phone, per the boss, 2026-10-07.)
-- No balances or net deposits, ever (not in the UI, database, logs, exports or screenshots).
+- No balances anywhere except the server-only `client_roster` table: never in the UI, browser, logs, exports, screenshots or on attendees.
 - Comply with the Nigeria Data Protection Act: show a short consent note at the desk, and provide a way for the Super Admin to **delete all event data after the event**.
 - Use HTTPS only. Secrets only on the server.
 - Registrars cannot export the list.
 - Log sign-ins, entries, edits, locks, draws, redraws and exports with user and time.
 - Show times in Lagos time (WAT, UTC+1).
 
-## 10. CRM lookup (later, not now)
+## 10. Client lookup (roster now, FXBO API later)
+
+**Built 2026-10-13:** the FXBO API is not available, so the company supplies an Excel sheet instead. A Super Admin uploads it on the Client roster page (columns: CRM ID, First Name, Middle Name optional, Last Name, Balance); `lookupClient` reads it server-side and fills name, Eligible and tickets on the registration form. `CRM_LOOKUP` = `roster` (default), `fake` or `off`. The text below is the original plan for a live FXBO connection and still applies if one is ever built.
 
 The company CRM is **FXBO**. We may later pull name, email and phone (and maybe eligibility and tickets) by Client ID. Public FXBO API documentation was not found, so **do not build against any guessed endpoint**.
 
@@ -231,4 +233,4 @@ Work one phase at a time. Finish and check each phase before the next. Read the 
 9. Client ID format. **Confirmed by owner 2026-10-06:** always exactly 6 digits; registration and edits require it.
 10. Email and phone. **Decided 2026-10-07 on the boss's instruction:** not collected or shown anywhere (form, list, edit, export, import). Only Client ID and name identify a person. Migration 0006 made the two columns optional; values saved before that stay in the database, hidden.
 11. Owner account. **Decided 2026-10-07:** Ayobami's account has `profiles.is_owner = true` (migration 0005, set only in the Supabase SQL editor). Other Super Admins cannot disable, demote or reset the password of the Owner.
-12. Ticket measure for the CRM lookup. **Decided by the boss 2026-10-09:** net deposit (deposits minus withdrawals), not balance or equity; same thresholds (1 ticket per $100, max 10 at $1,000). **Still open before connecting the CRM:** over what period (since the account opened, or since a date), one account or all of a client's accounts, whether bonuses/credits/internal transfers count, the currency, and the snapshot time.
+12. Ticket measure. The boss chose net deposit on 2026-10-09; **changed to account balance on 2026-10-13** (the company's sheet supplies balances); same thresholds (1 ticket per $100, max 10 at $1,000). **Still open if a live CRM is ever connected:** over what period (since the account opened, or since a date), one account or all of a client's accounts, whether bonuses/credits/internal transfers count, the currency, and the snapshot time.

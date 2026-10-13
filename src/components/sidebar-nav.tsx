@@ -12,6 +12,7 @@ const NAV_ITEMS = [
 // Not in the Figma sidebar; shown to Super Admins only (the page re-checks).
 const ADMIN_ITEMS = [
   { href: "/users", label: "Users" },
+  { href: "/roster", label: "Client roster" },
   { href: "/event-data", label: "Event data" },
 ];
 

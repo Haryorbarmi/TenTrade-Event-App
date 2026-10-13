@@ -1,7 +1,7 @@
 // TESTING ONLY: bulk-import attendees from a spreadsheet (Super Admin).
 // Every row goes through the same rules as the registration form.
 
-import { validateAttendee, type CleanAttendee } from "./attendee-validation";
+import { splitFullName, validateAttendee, type CleanAttendee } from "./attendee-validation";
 
 export const MAX_IMPORT_ROWS = 1000;
 
@@ -108,7 +108,8 @@ export function planImport(rows: SheetRow[], existingClientIds: Set<string>, ran
 
     const result = validateAttendee({
       clientId: fixClientId(cells.clientId),
-      name: cells.name,
+      ...splitFullName(cells.name),
+      middleName: "",
       eligible,
       tickets,
     });

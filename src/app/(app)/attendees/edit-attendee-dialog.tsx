@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { AttendeeFields, hintClass, type AttendeeValues } from "@/components/attendee-fields";
 import type { AttendeeRow } from "@/lib/attendees";
-import type { FieldErrors } from "@/lib/attendee-validation";
+import { splitFullName, type FieldErrors } from "@/lib/attendee-validation";
 import { formatLagosTime, shortName } from "@/lib/format";
 import { checkClientId } from "../registration/actions";
 import { deleteAttendee, getAttendeeHistory, getAttendeePrizes, updateAttendee, type AttendeeChange, type EditAttendeeState } from "./actions";
@@ -22,8 +22,15 @@ function showValue(field: string, value: string | null) {
   return value;
 }
 
-// Email and phone are no longer collected; old edits to them stay out of sight.
-const HIDDEN_FIELDS = new Set(["email", "phone"]);
+// Email and phone are no longer collected; old edits to them stay out of sight. The name
+// parts are hidden too: a name change already shows as one "Name" line.
+const HIDDEN_FIELDS = new Set(["email", "phone", "first_name", "middle_name", "last_name"]);
+
+// Entries made before names were split have no parts yet: the first word is the first name.
+function nameParts(a: AttendeeRow) {
+  if (a.first_name) return { firstName: a.first_name, middleName: a.middle_name ?? "", lastName: a.last_name ?? "" };
+  return { ...splitFullName(a.name), middleName: "" };
+}
 
 type Props = {
   attendee: AttendeeRow;
@@ -38,7 +45,7 @@ export function EditAttendeeDialog({ attendee, names, canSeeHistory, onClose }: 
   const clientIdRef = useRef<HTMLInputElement>(null);
   const [values, setValues] = useState<AttendeeValues>({
     clientId: attendee.client_id,
-    name: attendee.name,
+    ...nameParts(attendee),
     eligible: attendee.eligible,
     tickets: attendee.tickets,
   });

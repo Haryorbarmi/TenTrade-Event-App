@@ -8,12 +8,14 @@ import type { FieldErrors } from "@/lib/attendee-validation";
 
 export type AttendeeValues = {
   clientId: string;
-  name: string;
+  firstName: string;
+  middleName: string;
+  lastName: string;
   eligible: boolean | null;
   tickets: number;
 };
 
-export const EMPTY_VALUES: AttendeeValues = { clientId: "", name: "", eligible: null, tickets: 0 };
+export const EMPTY_VALUES: AttendeeValues = { clientId: "", firstName: "", middleName: "", lastName: "", eligible: null, tickets: 0 };
 
 const TICKET_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
@@ -68,19 +70,27 @@ export function AttendeeFields({ values, onChange, errors, clientIdWarning, clie
         )}
       </label>
 
-      <label className="flex w-full flex-col gap-[8px]">
-        <span className={label}>Name</span>
-        <input
-          name="name"
-          value={values.name}
-          onChange={(e) => set({ name: e.target.value })}
-          placeholder="Full name"
-          autoComplete="off"
-          aria-invalid={!!errors.name}
-          className={inputClass(!!errors.name)}
-        />
-        {errors.name && <span className={errorClass}>{errors.name}</span>}
-      </label>
+      {(
+        [
+          { field: "firstName", name: "firstName", caption: "First name", placeholder: "First name" },
+          { field: "middleName", name: "middleName", caption: "Middle name (optional)", placeholder: "Middle name" },
+          { field: "lastName", name: "lastName", caption: "Last name", placeholder: "Last name" },
+        ] as const
+      ).map(({ field, name, caption, placeholder }) => (
+        <label key={field} className="flex w-full flex-col gap-[8px]">
+          <span className={label}>{caption}</span>
+          <input
+            name={name}
+            value={values[field]}
+            onChange={(e) => set({ [field]: e.target.value })}
+            placeholder={placeholder}
+            autoComplete="off"
+            aria-invalid={!!errors[field]}
+            className={inputClass(!!errors[field])}
+          />
+          {errors[field] && <span className={errorClass}>{errors[field]}</span>}
+        </label>
+      ))}
 
       <fieldset className="flex w-full flex-col gap-[8px]">
         <legend className={`${label} mb-[8px]`}>Grand Draw eligibility</legend>

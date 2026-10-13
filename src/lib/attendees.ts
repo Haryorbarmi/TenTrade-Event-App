@@ -5,6 +5,9 @@ export type RecentRow = {
   seq: number;
   client_id: string;
   name: string;
+  first_name: string | null;
+  middle_name: string | null;
+  last_name: string | null;
   eligible: boolean;
   tickets: number;
   registered_by: string;
@@ -12,7 +15,7 @@ export type RecentRow = {
 };
 
 export const RECENT_LIMIT = 10;
-export const RECENT_COLUMNS = "id, seq, client_id, name, eligible, tickets, registered_by, created_at";
+export const RECENT_COLUMNS = "id, seq, client_id, name, first_name, middle_name, last_name, eligible, tickets, registered_by, created_at";
 
 // Only the Client ID and name are recorded about a person: no email or phone.
 export type AttendeeRow = RecentRow;

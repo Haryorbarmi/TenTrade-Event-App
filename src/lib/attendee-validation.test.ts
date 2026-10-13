@@ -3,7 +3,9 @@ import { validateAttendee, type AttendeeInput } from "./attendee-validation";
 
 const valid: AttendeeInput = {
   clientId: " 100234 ",
-  name: "  Ada   Obi ",
+  firstName: "  Ada ",
+  middleName: " Ngozi",
+  lastName: "  Obi ",
   eligible: true,
   tickets: 3,
 };
@@ -11,13 +13,13 @@ const valid: AttendeeInput = {
 describe("validateAttendee", () => {
   it("cleans a valid entry", () => {
     expect(validateAttendee(valid)).toEqual({
-      data: { client_id: "100234", name: "Ada Obi", eligible: true, tickets: 3 },
+      data: { client_id: "100234", name: "Ada Ngozi Obi", first_name: "Ada", middle_name: "Ngozi", last_name: "Obi", eligible: true, tickets: 3 },
     });
   });
 
   it("requires every field", () => {
-    const result = validateAttendee({ clientId: "", name: "", eligible: null, tickets: 0 });
-    expect("errors" in result && Object.keys(result.errors).sort()).toEqual(["clientId", "eligible", "name"]);
+    const result = validateAttendee({ clientId: "", firstName: "", middleName: "", lastName: "", eligible: null, tickets: 0 });
+    expect("errors" in result && Object.keys(result.errors).sort()).toEqual(["clientId", "eligible", "firstName", "lastName"]);
   });
 
   it("requires a Client ID of exactly 6 digits", () => {

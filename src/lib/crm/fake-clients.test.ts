@@ -11,8 +11,9 @@ describe("fakeLookup", () => {
     for (let n = 100001; n < 100400; n++) {
       const r = fakeLookup(String(n));
       if (!r.found) continue;
-      expect(Object.keys(r).sort()).toEqual(["eligible", "found", "name", "tickets"]);
-      expect(r.name.length).toBeGreaterThan(0);
+      expect(Object.keys(r).sort()).toEqual(["eligible", "firstName", "found", "lastName", "middleName", "tickets"]);
+      expect(r.firstName.length).toBeGreaterThan(0);
+      expect(r.lastName.length).toBeGreaterThan(0);
       expect(r.eligible ? r.tickets >= 1 && r.tickets <= 10 : r.tickets === 0).toBe(true);
     }
   });
