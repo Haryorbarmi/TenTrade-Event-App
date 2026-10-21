@@ -5,6 +5,7 @@
 import { CLIENT_ID_RE } from "./attendee-validation";
 
 export const MAX_ROSTER_ROWS = 20000;
+export const ROSTER_CONFIRM_PHRASE = "DELETE ROSTER";
 
 export type RosterRow = {
   client_id: string;

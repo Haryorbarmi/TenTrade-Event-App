@@ -3,6 +3,7 @@ import { getCurrentProfile } from "@/lib/auth";
 import { isSuperAdmin } from "@/lib/roles";
 import { ticketsForBalance } from "@/lib/tickets";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ClearRoster } from "./clear-roster";
 import { UploadRoster } from "./upload-roster";
 
 export const metadata = { title: "Client roster · TenTrade Lagos Seminar 2026" };
@@ -37,7 +38,10 @@ export default async function RosterPage() {
             {total === 0 ? "No clients imported yet." : `${total} clients${importedAt ? ` · imported ${importedAt}` : ""}`}
           </p>
         </div>
-        <UploadRoster hasRoster={total > 0} />
+        <div className="flex shrink-0 flex-col items-start gap-[12px] md:items-end">
+          <UploadRoster hasRoster={total > 0} />
+          {total > 0 && <ClearRoster total={total} />}
+        </div>
       </header>
 
       {total > 0 && (

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireSuperAdmin } from "@/lib/auth";
 import { readTable } from "@/lib/read-table";
-import { MAX_ROSTER_ROWS, planRosterImport, rosterTableToRows } from "@/lib/roster-import";
+import { MAX_ROSTER_ROWS, ROSTER_CONFIRM_PHRASE, planRosterImport, rosterTableToRows } from "@/lib/roster-import";
 import { createAdminClient, logActivity } from "@/lib/supabase/admin";
 
 export type RosterImportState =
@@ -48,4 +48,22 @@ export async function importRoster(_prev: RosterImportState, formData: FormData)
   await logActivity(me.id, "roster_imported", { imported: plan.rows.length, skipped: plan.skipped.length });
   revalidatePath("/roster");
   return { status: "done", imported: plan.rows.length, skipped: plan.skipped };
+}
+
+export type ClearRosterResult = { ok: true; deleted: number } | { ok: false; error: string };
+
+// Empties the roster so it can be restarted. Attendees already registered keep their details;
+// only the lookup table is cleared. Needs the typed phrase, like the Event data page.
+export async function clearRoster(confirmation: string): Promise<ClearRosterResult> {
+  const me = await requireSuperAdmin();
+  if (confirmation.trim() !== ROSTER_CONFIRM_PHRASE) return { ok: false, error: `Type ${ROSTER_CONFIRM_PHRASE} to confirm.` };
+
+  const db = createAdminClient();
+  const { count } = await db.from("client_roster").select("client_id", { count: "exact", head: true });
+  const { error } = await db.from("client_roster").delete().neq("client_id", "");
+  if (error) return { ok: false, error: "Could not clear the roster. Try again." };
+
+  await logActivity(me.id, "roster_cleared", { deleted: count ?? 0 });
+  revalidatePath("/roster");
+  return { ok: true, deleted: count ?? 0 };
 }
