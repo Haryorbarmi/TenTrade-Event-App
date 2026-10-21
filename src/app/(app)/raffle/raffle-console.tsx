@@ -9,6 +9,7 @@ import { DISPLAY_LABELS } from "@/lib/display";
 import { prizeSummary } from "@/lib/prizes";
 import { RESET_PREFIX } from "@/lib/raffle-labels";
 import { confirmQuizResult, drawNextWinner, lockDrawList, type ShowPayload } from "./actions";
+import { DrawSelect } from "./draw-select";
 import { DisplayControls, useCountdownSetting } from "./display-controls";
 import { useDisplayLink } from "./use-display-link";
 import { QuizResultSetup, QuizStage, useQuiz } from "./knowledge-panel";
@@ -127,27 +128,7 @@ export function RaffleConsole({ draws, draw, stats, winners, names, earlyBirdCut
         {/* Setup */}
         <section className="flex w-full flex-col items-start gap-[20px] rounded-[12px] border border-line bg-white p-6 md:p-[32px] lg:w-[400px] lg:shrink-0">
           <h2 className="text-[16px] font-semibold leading-[normal] text-ink">1. Choose the draw</h2>
-          <label className="relative w-full">
-            <span className="sr-only">Draw</span>
-            <select
-              value={draw.type}
-              onChange={(e) => {
-                setError(null);
-                router.push(`/raffle?draw=${e.target.value}`);
-              }}
-              className="h-[48px] w-full cursor-pointer appearance-none rounded-[8px] border border-line bg-white pl-[16px] pr-[40px] text-[14px] text-ink outline-none focus:border-accent"
-            >
-              {draws.map((d) => (
-                <option key={d.id} value={d.type}>
-                  {d.name} · {money(d.prize_amount)}
-                  {d.status === "done" ? " · done" : d.status === "locked" ? " · locked" : ""}
-                </option>
-              ))}
-            </select>
-            <span className="pointer-events-none absolute right-[16px] top-1/2 -translate-y-1/2 text-[9px] text-muted" aria-hidden>
-              ▼
-            </span>
-          </label>
+          <DrawSelect draws={draws} value={draw.type} onChange={() => setError(null)} />
 
           <PoolSummary draw={draw} stats={stats} earlyBirdCutoff={earlyBirdCutoff} tagged={participants.length} />
           {draw.type === "engagement" && <ParticipantTags participants={participants} editable={draw.status === "open"} />}

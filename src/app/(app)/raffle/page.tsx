@@ -4,6 +4,8 @@ import type { DrawType } from "@/lib/draw-engine";
 import { excludedAttendeeIds, previewPool, type Draw } from "@/lib/raffle";
 import { canAccessRaffle } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
+import { TENEDGE_5K } from "@/lib/raffle-labels";
+import { Tenedge5k } from "./tenedge-5k";
 import { RaffleConsole, type DrawWinnerRow, type PoolStats } from "./raffle-console";
 
 export const metadata = { title: "Raffle · TenTrade Lagos Seminar 2026" };
@@ -22,6 +24,7 @@ export default async function RafflePage({ searchParams }: PageProps<"/raffle">)
   const draws = DRAW_ORDER.map((t) => (drawRows as Draw[]).find((d) => d.type === t)).filter((d): d is Draw => !!d);
 
   const { draw: requested } = await searchParams;
+  if (requested === TENEDGE_5K) return <Tenedge5k draws={draws.map(({ id, type, name, prize_amount, status }) => ({ id, type, name, prize_amount, status }))} />;
   const draw = draws.find((d) => d.type === requested) ?? draws[0]!;
 
   const [{ data: winnerRows }, { data: profiles }, excluded, { data: fiftieth }, { data: tagged }] = await Promise.all([
