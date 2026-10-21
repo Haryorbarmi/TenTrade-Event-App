@@ -1,5 +1,7 @@
 // Dashboard numbers (CLAUDE.md section 5), all computed from real data.
 
+import { prizeAt, type PrizeDraw } from "./prizes";
+
 export const SLOT_MINUTES = 10;
 const SLOT_MS = SLOT_MINUTES * 60_000;
 
@@ -26,14 +28,14 @@ export function peakSlot(slots: Slot[]): (Slot & { end: number }) | null {
   return best ? { ...best, end: best.start + SLOT_MS } : null;
 }
 
-export type DrawSummaryInput = { status: "open" | "locked" | "done"; prize_amount: number; winners_count: number };
+export type DrawSummaryInput = PrizeDraw & { status: "open" | "locked" | "done" };
 
-// Draws done, and money awarded so far: each current winner gets the draw's
-// prize divided by its number of winners (Event Engagement: $250 / 5 = $50 each).
-export function drawProgress(draws: (DrawSummaryInput & { currentWinners: number })[]) {
+// Draws done, and money awarded so far: each current winner gets the prize for their
+// position (see prizes.ts).
+export function drawProgress(draws: (DrawSummaryInput & { winnerPositions: number[] })[]) {
   return {
     done: draws.filter((d) => d.status === "done").length,
     total: draws.length,
-    awarded: draws.reduce((sum, d) => sum + (d.prize_amount / d.winners_count) * d.currentWinners, 0),
+    awarded: draws.reduce((sum, d) => sum + d.winnerPositions.reduce((s, p) => s + prizeAt(d, p), 0), 0),
   };
 }

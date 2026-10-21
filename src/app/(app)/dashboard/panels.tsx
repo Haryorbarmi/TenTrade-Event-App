@@ -1,12 +1,12 @@
 /* eslint-disable @next/next/no-img-element -- small SVG dots from Figma */
 import { EligibilityPill } from "@/components/attendee-pills";
 import { formatLagosTime } from "@/lib/format";
+import { prizeSummary } from "@/lib/prizes";
 
 const panel = "flex min-w-px flex-col rounded-[12px] border border-line bg-white p-[28px]";
 const title = "text-[16px] font-semibold leading-[normal] text-ink";
-const money = (n: number) => `$${n.toLocaleString("en-US")}`;
 
-type DrawRow = { id: string; name: string; prize_amount: number; winners_count: number; status: "open" | "locked" | "done" };
+type DrawRow = { id: string; type: string; name: string; prize_amount: number; winners_count: number; status: "open" | "locked" | "done" };
 
 const STATUS = {
   locked: { label: "Ready", cls: "bg-[rgba(246,101,132,0.12)] text-accent-from", dot: "/brand/dot-ready.svg" },
@@ -26,7 +26,7 @@ export function DrawsPanel({ draws }: { draws: DrawRow[] }) {
             <div className="flex min-w-0 flex-col gap-[2px] leading-[normal]">
               <span className="truncate text-[14px] text-ink">{d.name}</span>
               <span className="text-[12px] font-light text-muted">
-                {d.winners_count > 1 ? `${d.winners_count} × ${money(d.prize_amount / d.winners_count)}` : money(d.prize_amount)}
+                {prizeSummary(d)}
               </span>
             </div>
             <span className={`inline-flex shrink-0 items-center gap-[6px] rounded-full px-[10px] py-[4px] text-[12px] font-semibold leading-[normal] ${s.cls}`}>

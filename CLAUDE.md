@@ -139,7 +139,7 @@ Prizes in scope (the social-media draw is **excluded**):
 | Early Bird | $500, 1 winner | The first 50 attendees by arrival number (`seq` 1 to 50) | Equal |
 | Event Engagement | $250: 5 winners × $50 | Attendees tagged as participants | Equal |
 | Knowledge Challenge | $100 | Decided by a quiz run in a separate tool | See below |
-| Lucky Attendee | $50, 1 winner | All checked-in attendees | Equal |
+| Lucky Attendee | $150, 2 winners: $100 (first round), $50 (second round) | All checked-in attendees | Equal |
 
 Rules that apply to every draw:
 

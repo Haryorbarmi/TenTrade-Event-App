@@ -30,10 +30,18 @@ describe("peakSlot", () => {
 describe("drawProgress", () => {
   it("counts finished draws and money awarded per current winner", () => {
     const p = drawProgress([
-      { status: "done", prize_amount: 500, winners_count: 1, currentWinners: 1 }, // Early Bird
-      { status: "locked", prize_amount: 250, winners_count: 5, currentWinners: 2 }, // Engagement, 2 of 5 so far
-      { status: "open", prize_amount: 1000, winners_count: 1, currentWinners: 0 },
+      { type: "early_bird", status: "done", prize_amount: 500, winners_count: 1, winnerPositions: [1] },
+      { type: "engagement", status: "locked", prize_amount: 250, winners_count: 5, winnerPositions: [1, 2] }, // 2 of 5 so far
+      { type: "grand", status: "open", prize_amount: 1000, winners_count: 1, winnerPositions: [] },
     ]);
     expect(p).toEqual({ done: 1, total: 3, awarded: 600 });
+  });
+
+  it("pays Lucky Attendee $100 for the first round and $50 for the second", () => {
+    const lucky = { type: "lucky", prize_amount: 150, winners_count: 2 };
+    const awarded = (winnerPositions: number[]) => drawProgress([{ ...lucky, status: "locked", winnerPositions }]).awarded;
+    expect(awarded([1])).toBe(100);
+    expect(awarded([2])).toBe(50); // first round was replaced, second still holds
+    expect(awarded([1, 2])).toBe(150);
   });
 });

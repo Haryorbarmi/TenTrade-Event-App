@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import type { DrawType } from "@/lib/draw-engine";
 import { formatLagosTime, shortName } from "@/lib/format";
 import { DISPLAY_LABELS } from "@/lib/display";
+import { prizeSummary } from "@/lib/prizes";
 import { RESET_PREFIX } from "@/lib/raffle-labels";
 import { confirmQuizResult, drawNextWinner, lockDrawList, type ShowPayload } from "./actions";
 import { DisplayControls, useCountdownSetting } from "./display-controls";
@@ -175,7 +176,7 @@ export function RaffleConsole({ draws, draw, stats, winners, names, earlyBirdCut
           <h2 className="text-[16px] font-semibold leading-[normal] text-ink">3. Prize</h2>
           <p className="flex h-[48px] w-full items-center rounded-[8px] border border-line bg-white px-[16px] text-[14px] font-light text-ink">
             {draw.winners_count > 1
-              ? `${money(draw.prize_amount)} · ${draw.winners_count} winners × ${money(draw.prize_amount / draw.winners_count)}`
+              ? `${money(draw.prize_amount)} · ${draw.winners_count} winners: ${prizeSummary(draw)}`
               : `${money(draw.prize_amount)} · 1 winner`}
           </p>
 

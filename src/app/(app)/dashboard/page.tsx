@@ -33,7 +33,7 @@ export default async function DashboardPage() {
     supabase.from("attendees").select("seq, client_id, name, eligible, tickets, created_at").order("seq", { ascending: false }),
     supabase.from("event_settings").select("expected_attendees").eq("id", 1).maybeSingle(),
     admin.from("draws").select("id, type, name, status, prize_amount, winners_count"),
-    admin.from("winners").select("draw_id").eq("replaced", false),
+    admin.from("winners").select("draw_id, position").eq("replaced", false),
   ]);
 
   const rows = attendees ?? [];
@@ -42,7 +42,7 @@ export default async function DashboardPage() {
   const peak = peakSlot(slots);
   const orderedDraws = DRAW_ORDER.map((t) => (draws ?? []).find((d) => d.type === t)).filter((d) => !!d);
   const progress = drawProgress(
-    (draws ?? []).map((d) => ({ ...d, currentWinners: (winners ?? []).filter((w) => w.draw_id === d.id).length })),
+    (draws ?? []).map((d) => ({ ...d, winnerPositions: (winners ?? []).filter((w) => w.draw_id === d.id).map((w) => w.position) })),
   );
 
   return (
